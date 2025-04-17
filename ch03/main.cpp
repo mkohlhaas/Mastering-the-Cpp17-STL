@@ -3,22 +3,24 @@
 #include <cassert>
 #include <cctype>
 #include <cstdio>
+#include <forward_list>
 #include <functional>
 #include <iostream>
 #include <list>
 #include <numeric>
 #include <set>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
-namespace ex1
+namespace ex01
 {
     void
     test()
     {
-        // ex1
         constexpr int N = 10;
-        int           a[N];
+
+        int a[N];
 
         // A correct for-loop.
         for (int i = 0; i < N; ++i)
@@ -26,30 +28,28 @@ namespace ex1
             // ...
         }
 
-        // One variety of "smelly" for-loop.
+        // one variety of "smelly" for-loop
         for (int i = 0; i <= N; ++i)
         {
             // ...
         }
 
-        // A correct invocation of a standard algorithm.
-        std::count_if(std::begin(a), std::end(a), [](int) { return true; });
+        // a correct invocation of a standard algorithm
+        [[maybe_unused]] auto c1 = std::count_if(std::begin(a), std::end(a), [](int) { return true; });
 
-        // A "smelly" invocation.
-        std::count_if(std::begin(a), std::end(a) - 1, [](int) { return true; });
+        // A "smelly" invocation
+        [[maybe_unused]] auto c2 = std::count_if(std::begin(a), std::end(a) - 1, [](int) { return true; });
 
-        // A "trivial" invocation: counting a range of length zero.
-        std::count_if(std::begin(a), std::begin(a), [](int) { return true; });
-        // dex1
+        // a "trivial" invocation: counting a range of length zero
+        [[maybe_unused]] auto c3 = std::count_if(std::begin(a), std::begin(a), [](int) { return true; });
     }
-} // namespace ex1
+} // namespace ex01
 
-namespace ex2
+namespace ex02
 {
     void
     test()
     {
-        // ex2
         int                    a[]{1, 2, 3, 4, 5};
         std::list<int>         lst{1, 2, 3, 4, 5};
         std::forward_list<int> flst{1, 2, 3, 4, 5};
@@ -59,39 +59,33 @@ namespace ex2
         assert(std::distance(std::begin(flst), std::end(flst)) == 5);
 
         assert(std::distance(std::end(a), std::begin(a)) == -5);
-        // dex2
-        // ex39
-        //  The following line gives an "incorrect" answer!
-        //  assert(std::distance(std::end(lst), std::begin(lst)) == 1);
-        //  And this one just segfaults!
-        //  std::distance(std::end(flst), std::begin(flst));
-        // dex39
-    }
-} // namespace ex2
 
-namespace ex3
+        //  The following line gives an "incorrect" answer!
+        // assert(std::distance(std::end(lst), std::begin(lst)) == 1);
+
+        //  And this one just segfaults!
+        // [[maybe_unused]] auto i = std::distance(std::end(flst), std::begin(flst));
+    }
+} // namespace ex02
+
+namespace ex03
 {
     void
     test()
     {
-        // ex3
         std::set<int> s{1, 2, 3, 10, 42, 99};
-        bool          present;
 
         // O(n): compare each element with 42
-        present = std::count(s.begin(), s.end(), 42);
+        [[maybe_unused]] auto present = std::count(s.begin(), s.end(), 42);
 
         // O(log n): ask the container to look up 42 itself
         present = s.count(42);
-        // dex3
-        (void)present;
     }
-} // namespace ex3
+} // namespace ex03
 
-namespace ex4
+namespace ex04
 {
-    // ex4
-    template <class InputIterator, class UnaryPredicate>
+    template <typename InputIterator, typename UnaryPredicate>
     InputIterator
     find_if(InputIterator first, InputIterator last, UnaryPredicate p)
     {
@@ -105,48 +99,45 @@ namespace ex4
         return last;
     }
 
-    template <class It, class U>
+    template <typename It, typename U>
     It
     find_if_not(It first, It last, U p)
     {
         return std::find_if(first, last, [&](auto &&e) { return !p(e); });
     }
 
-    template <class It, class T>
+    template <typename It, typename T>
     It
     find(It first, It last, T value)
     {
         return std::find_if(first, last, [&](auto &&e) { return e == value; });
     }
-    // dex4
-    // ex5
-    template <class It, class UnaryPredicate>
+
+    template <typename It, typename UnaryPredicate>
     bool
     all_of(It first, It last, UnaryPredicate p)
     {
         return std::find_if_not(first, last, p) == last;
     }
 
-    template <class It, class U>
+    template <typename It, typename U>
     bool
     any_of(It first, It last, U p)
     {
         return std::find_if(first, last, p) != last;
     }
 
-    template <class It, class U>
+    template <typename It, typename U>
     bool
     none_of(It first, It last, U p)
     {
         return std::find_if(first, last, p) == last;
     }
-    // dex5
-} // namespace ex4
+} // namespace ex04
 
-namespace ex6
+namespace ex06
 {
-    // ex6
-    template <class It, class FwdIt>
+    template <typename It, typename FwdIt>
     It
     find_first_of(It first, It last, FwdIt targetfirst, FwdIt targetlast)
     {
@@ -155,7 +146,7 @@ namespace ex6
         });
     }
 
-    template <class It, class FwdIt, class BinaryPredicate>
+    template <typename It, typename FwdIt, typename BinaryPredicate>
     It
     find_first_of(It first, It last, FwdIt targetfirst, FwdIt targetlast, BinaryPredicate p)
     {
@@ -163,44 +154,43 @@ namespace ex6
             return std::any_of(targetfirst, targetlast, [&](auto &&t) { return p(e, t); });
         });
     }
-    // dex6
 
     void
     test()
     {
         std::vector<int> v{1, 2, 3, 4};
         std::vector<int> t{5, 3};
-        auto             it  = ex6::find_first_of(v.begin(), v.end(), t.begin(), t.end());
-        auto             it2 = std::find_first_of(v.begin(), v.end(), t.begin(), t.end());
-        assert(it == it2);
-        assert(*it == 3);
-    }
-} // namespace ex6
 
-namespace ex7
+        auto it1 = ex06::find_first_of(v.begin(), v.end(), t.begin(), t.end());
+        auto it2 = std::find_first_of(v.begin(), v.end(), t.begin(), t.end());
+
+        assert(it1 == it2);
+        assert(*it1 == 3);
+    }
+} // namespace ex06
+
+namespace ex07
 {
     void
     test()
     {
-        // ex7
         std::istream_iterator<char> ii(std::cin);
         std::istream_iterator<char> iend{};
-        std::string                 s = "hello";
+
+        std::string s = "hello";
 
         // Chomp characters from std::cin until finding an 'h', 'e', 'l', or 'o'.
-        std::find_first_of(ii, iend, s.begin(), s.end());
-        // dex7
+        auto _ = std::find_first_of(ii, iend, s.begin(), s.end());
     }
-} // namespace ex7
+} // namespace ex07
 
-namespace ex8
+namespace ex08
 {
-    // ex8
-    template <class T>
+    template <typename T>
     constexpr bool is_random_access_iterator_v =
         std::is_base_of_v<std::random_access_iterator_tag, typename std::iterator_traits<T>::iterator_category>;
 
-    template <class It1, class It2, class B>
+    template <typename It1, typename It2, typename B>
     auto
     mismatch(It1 first1, It1 last1, It2 first2, It2 last2, B p)
     {
@@ -212,14 +202,14 @@ namespace ex8
         return std::make_pair(first1, first2);
     }
 
-    template <class It1, class It2>
+    template <typename It1, typename It2>
     auto
     mismatch(It1 first1, It1 last1, It2 first2, It2 last2)
     {
         return std::mismatch(first1, last1, first2, last2, std::equal_to<>{});
     }
 
-    template <class It1, class It2, class B>
+    template <typename It1, typename It2, typename B>
     bool
     equal(It1 first1, It1 last1, It2 first2, It2 last2, B p)
     {
@@ -234,19 +224,17 @@ namespace ex8
         return std::mismatch(first1, last1, first2, last2, p) == std::make_pair(last1, last2);
     }
 
-    template <class It1, class It2>
+    template <typename It1, typename It2>
     bool
     equal(It1 first1, It1 last1, It2 first2, It2 last2)
     {
         return std::equal(first1, last1, first2, last2, std::equal_to<>{});
     }
-    // dex8
-} // namespace ex8
+} // namespace ex08
 
-namespace ex9
+namespace ex09
 {
-    // ex9
-    template <class InIt, class OutIt>
+    template <typename InIt, typename OutIt>
     OutIt
     copy(InIt first1, InIt last1, OutIt destination)
     {
@@ -258,8 +246,7 @@ namespace ex9
         }
         return destination;
     }
-    // dex9
-    // ex10
+
     class putc_iterator : public boost::iterator_facade<putc_iterator,       // T
                                                         const putc_iterator, // value_type
                                                         std::output_iterator_tag>
@@ -271,10 +258,12 @@ namespace ex9
         {
             return *this;
         }
+
         void
         increment()
         {
         }
+
         bool
         equal(const putc_iterator &) const
         {
@@ -293,11 +282,11 @@ namespace ex9
     void
     test()
     {
-        std::string s = "hello";
+        std::string s = "hello\n";
         std::copy(s.begin(), s.end(), putc_iterator{});
     }
-    // dex10
-} // namespace ex9
+} // namespace ex09
+
 namespace ex11
 {
     namespace std
@@ -308,13 +297,14 @@ namespace ex11
         using ::std::string;
         using ::std::vector;
     } // namespace std
-    // ex11
+
     namespace std
     {
-        template <class Container>
+        template <typename Container>
         class back_insert_iterator
         {
             using CtrValueType = typename Container::value_type;
+
             Container *c;
 
           public:
@@ -333,11 +323,13 @@ namespace ex11
             {
                 return *this;
             }
+
             auto &
             operator++()
             {
                 return *this;
             }
+
             auto &
             operator++(int)
             {
@@ -350,6 +342,7 @@ namespace ex11
                 c->push_back(v);
                 return *this;
             }
+
             auto &
             operator=(CtrValueType &&v)
             {
@@ -358,7 +351,7 @@ namespace ex11
             }
         };
 
-        template <class Container>
+        template <typename Container>
         auto
         back_inserter(Container &c)
         {
@@ -369,12 +362,12 @@ namespace ex11
     void
     test()
     {
-        std::string       s = "hello";
+        std::string s = "hello";
+
         std::vector<char> dest;
         std::copy(s.begin(), s.end(), std::back_inserter(dest));
         assert(dest.size() == 5);
     }
-    // dex11
 } // namespace ex11
 
 namespace ex12
@@ -389,15 +382,14 @@ namespace ex12
         using ::std::string;
         using ::std::vector;
 
-        template <class T>
+        template <typename T>
         decltype(auto)
         move(T &&t)
         {
             return static_cast<remove_reference_t<T> &&>(t);
         }
 
-        // ex12
-        template <class InIt, class OutIt>
+        template <typename InIt, typename OutIt>
         OutIt
         move(InIt first1, InIt last1, OutIt destination)
         {
@@ -409,9 +401,8 @@ namespace ex12
             }
             return destination;
         }
-        // dex12
-        // ex13
-        template <class It>
+
+        template <typename It>
         class move_iterator
         {
             using OriginalRefType = typename std::iterator_traits<It>::reference;
@@ -433,11 +424,12 @@ namespace ex12
             // Allow constructing or assigning from any kind of move-iterator.
             // These templates also serve as our own type's copy constructor
             // and assignment operator, respectively.
-            template <class U>
+            template <typename U>
             constexpr move_iterator(const move_iterator<U> &m) : iter(m.base())
             {
             }
-            template <class U>
+
+            template <typename U>
             constexpr auto &
             operator=(const move_iterator<U> &m)
             {
@@ -456,11 +448,13 @@ namespace ex12
             {
                 return static_cast<reference>(*iter);
             }
+
             It
             operator->()
             {
                 return iter;
             }
+
             constexpr decltype(auto)
             operator[](difference_type n) const
             {
@@ -473,6 +467,7 @@ namespace ex12
                 ++iter;
                 return *this;
             }
+
             auto &
             operator++(int)
             {
@@ -480,12 +475,14 @@ namespace ex12
                 ++*this;
                 return result;
             }
+
             auto &
             operator--()
             {
                 --iter;
                 return *this;
             }
+
             auto &
             operator--(int)
             {
@@ -500,6 +497,7 @@ namespace ex12
                 iter += n;
                 return *this;
             }
+
             constexpr auto &
             operator-=(difference_type n) const
             {
@@ -511,20 +509,21 @@ namespace ex12
         // I've omitted the definitions of non-member operators
         // == != < <= > >= + - ; can you fill them in?
 
-        template <class InputIterator>
+        template <typename InputIterator>
         auto
         make_move_iterator(InputIterator &c)
         {
             return move_iterator(c);
         }
-        // dex13
-        template <class T, class U>
+
+        template <typename T, class U>
         bool
         operator!=(const move_iterator<T> &t, const move_iterator<U> &u)
         {
             return t.base() != u.base();
         }
-        template <class T>
+
+        template <typename T>
         bool
         operator-(const move_iterator<T> &t, const move_iterator<T> &u)
         {
@@ -535,7 +534,6 @@ namespace ex12
     void
     test()
     {
-        // ex14
         std::vector<std::string> input = {"hello", "world"};
         std::vector<std::string> output(2);
 
@@ -544,7 +542,6 @@ namespace ex12
 
         // Second approach: use move_iterator
         std::copy(std::move_iterator(input.begin()), std::move_iterator(input.end()), output.begin());
-        // dex14
     }
 } // namespace ex12
 
@@ -553,7 +550,6 @@ namespace ex15
     void
     test()
     {
-        // ex15
         std::vector<const char *> input = {"hello", "world"};
         std::vector<std::string>  output(2);
 
@@ -561,14 +557,13 @@ namespace ex15
 
         assert(output[0] == "hello");
         assert(output[1] == "world");
-        // dex15
     }
 } // namespace ex15
 
 namespace ex16
 {
     // ex16
-    template <class InIt, class OutIt, class Unary>
+    template <typename InIt, typename OutIt, typename Unary>
     OutIt
     transform(InIt first1, InIt last1, OutIt destination, Unary op)
     {
@@ -596,13 +591,11 @@ namespace ex16
         assert(input[0] == "hello");
         assert(output[0] == "HELLO");
     }
-    // dex16
 } // namespace ex16
 
 namespace ex17
 {
-    // ex17
-    template <class InIt1, class InIt2, class OutIt, class Binary>
+    template <typename InIt1, typename InIt2, typename OutIt, typename Binary>
     OutIt
     transform(InIt1 first1, InIt1 last1, InIt2 first2, OutIt destination, Binary op)
     {
@@ -615,7 +608,6 @@ namespace ex17
         }
         return destination;
     }
-    // dex17
 } // namespace ex17
 
 namespace ex18
@@ -623,21 +615,19 @@ namespace ex18
     void
     test()
     {
-        // ex18
         std::vector<std::string> input = {"hello", "world"};
         std::vector<std::string> output(2);
 
         // Third approach: use std::transform
         std::transform(input.begin(), input.end(), output.begin(), std::move<std::string &>);
-        // dex18
+
         assert(output[0] == "hello");
     }
 } // namespace ex18
 
 namespace ex19
 {
-    // ex19
-    template <class FwdIt, class T>
+    template <typename FwdIt, typename T>
     void
     fill(FwdIt first, FwdIt last, T value)
     {
@@ -648,7 +638,7 @@ namespace ex19
         }
     }
 
-    template <class FwdIt, class T>
+    template <typename FwdIt, typename T>
     void
     iota(FwdIt first, FwdIt last, T value)
     {
@@ -660,7 +650,7 @@ namespace ex19
         }
     }
 
-    template <class FwdIt, class G>
+    template <typename FwdIt, typename G>
     void
     generate(FwdIt first, FwdIt last, G generator)
     {
@@ -670,11 +660,10 @@ namespace ex19
             ++first;
         }
     }
-    // dex19
+
     void
     test()
     {
-        // ex20
         std::vector<std::string> v(4);
 
         std::fill(v.begin(), v.end(), "hello");
@@ -694,7 +683,6 @@ namespace ex19
         assert(v[1] == "world");
         assert(v[2] == "hello");
         assert(v[3] == "world");
-        // dex20
     }
 } // namespace ex19
 
@@ -703,17 +691,14 @@ namespace ex21
     void
     test()
     {
-        // ex21
         std::vector<int> v = {3, 1, 4, 1, 5, 9};
         std::sort(v.begin(), v.end(), [](auto &&a, auto &&b) { return a % 7 < b % 7; });
         assert((v == std::vector{1, 1, 9, 3, 4, 5}));
-        // dex21
     }
 } // namespace ex21
 
 namespace ex22
 {
-    // ex22
     namespace my
     {
         class obj
@@ -746,17 +731,17 @@ namespace ex22
         int              i1 = 1, i2 = 2;
         std::vector<int> v1 = {1}, v2 = {2};
         my::obj          m1 = 1, m2 = 2;
+
         using std::swap;
+
         swap(i1, i2); // calls std::swap<int>(int&, int&)
         swap(v1, v2); // calls std::swap(vector&, vector&)
         swap(m1, m2); // calls my::swap(obj&, obj&)
     }
-    // dex22
 } // namespace ex22
 
 namespace ex23
 {
-    // ex23
     void
     reverse_words_in_place(std::string &s)
     {
@@ -784,7 +769,6 @@ namespace ex23
         reverse_words_in_place(s);
         assert(s == "dog lazy the over jumps fox brown quick the");
     }
-    // dex23
 } // namespace ex23
 
 namespace ex24
@@ -793,8 +777,8 @@ namespace ex24
     {
         using ::std::swap;
         using ::std::vector;
-        // ex24
-        template <class BidirIt>
+
+        template <typename BidirIt>
         void
         reverse(BidirIt first, BidirIt last)
         {
@@ -811,7 +795,7 @@ namespace ex24
             }
         }
 
-        template <class BidirIt, class Unary>
+        template <typename BidirIt, typename Unary>
         auto
         partition(BidirIt first, BidirIt last, Unary p)
         {
@@ -826,12 +810,16 @@ namespace ex24
                 {
                     --last;
                 } while (last != first && !p(*last));
+
                 if (first == last)
                 {
                     break;
                 }
+
                 using std::swap;
+
                 swap(*first, *last);
+
                 do
                 {
                     ++first;
@@ -848,7 +836,6 @@ namespace ex24
             assert(it == v.begin() + 3);
             assert((v == std::vector{6, 2, 4, 1, 5, 9, 1, 3, 5}));
         }
-        // dex24
     } // namespace std
 } // namespace ex24
 
@@ -861,23 +848,23 @@ namespace ex25
         using ::std::reverse_iterator;
         using ::std::swap;
         using ::std::vector;
-        // ex25
+
         //  Shorthands for "reversing" and "unreversing".
-        template <class It>
+        template <typename It>
         auto
         rev(It it)
         {
             return std::reverse_iterator(it);
         };
 
-        template <class InnerIt>
+        template <typename InnerIt>
         auto
         unrev(std::reverse_iterator<InnerIt> it)
         {
             return it.base();
         }
 
-        template <class BidirIt, class Unary>
+        template <typename BidirIt, typename Unary>
         auto
         partition(BidirIt first, BidirIt last, Unary p)
         {
@@ -896,7 +883,6 @@ namespace ex25
             }
             return first;
         }
-        // dex25
     } // namespace std
     void
     test()
@@ -914,8 +900,8 @@ namespace ex26
 #define push_heap PushHeap
 #define pop_heap  PopHeap
 #define sort_heap SortHeap
-    // ex26
-    template <class RandomIt>
+
+    template <typename RandomIt>
     void
     push_heap(RandomIt a, RandomIt b)
     {
@@ -932,7 +918,7 @@ namespace ex26
         }
     }
 
-    template <class RandomIt>
+    template <typename RandomIt>
     void
     pop_heap(RandomIt a, RandomIt b)
     {
@@ -965,7 +951,7 @@ namespace ex26
         }
     }
 
-    template <class RandomIt>
+    template <typename RandomIt>
     void
     make_heap(RandomIt a, RandomIt b)
     {
@@ -975,7 +961,7 @@ namespace ex26
         }
     }
 
-    template <class RandomIt>
+    template <typename RandomIt>
     void
     sort_heap(RandomIt a, RandomIt b)
     {
@@ -985,14 +971,14 @@ namespace ex26
         }
     }
 
-    template <class RandomIt>
+    template <typename RandomIt>
     void
     sort(RandomIt a, RandomIt b)
     {
         make_heap(a, b);
         sort_heap(a, b);
     }
-// dex26
+
 #undef make_heap
 #undef push_heap
 #undef pop_heap
@@ -1002,10 +988,13 @@ namespace ex26
     test()
     {
         std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
+
         ex26::sort(v.begin(), v.end());
         assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
+
         ex26::sort(v.begin() + 2, v.begin() + 2);
         assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
+
         ex26::sort(v.begin() + 2, v.begin() + 3);
         assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
     }
@@ -1018,8 +1007,8 @@ namespace ex27
         using ::std::distance;
         using ::std::inplace_merge;
         using ::std::vector;
-        // ex27
-        template <class RandomIt>
+
+        template <typename RandomIt>
         void
         sort(RandomIt a, RandomIt b)
         {
@@ -1032,16 +1021,18 @@ namespace ex27
                 std::inplace_merge(a, mid, b);
             }
         }
-        // dex27
     } // namespace std
     void
     test()
     {
         std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
+
         std::sort(v.begin(), v.end());
         assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
+
         std::sort(v.begin() + 2, v.begin() + 2);
         assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
+
         std::sort(v.begin() + 2, v.begin() + 3);
         assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
     }
@@ -1054,8 +1045,8 @@ namespace ex28
         using ::std::find;
         using ::std::reverse;
         using ::std::vector;
-        // ex28
-        template <class FwdIt>
+
+        template <typename FwdIt>
         FwdIt
         rotate(FwdIt a, FwdIt mid, FwdIt b)
         {
@@ -1080,7 +1071,6 @@ namespace ex28
             assert((v == std::vector{5, 6, 1, 2, 3, 4}));
             assert(*one == 1);
         }
-        // dex28
     } // namespace std
 } // namespace ex28
 
@@ -1089,7 +1079,6 @@ namespace ex29
     void
     test()
     {
-        // ex29
         std::vector<int>              p = {10, 20, 30};
         std::vector<std::vector<int>> results;
 
@@ -1108,18 +1097,17 @@ namespace ex29
                                {30, 10, 20},
                                {30, 20, 10},
                            }));
-        // dex29
     }
 } // namespace ex29
 
 namespace ex30
 {
-    // ex30
-    template <class FwdIt, class T, class C>
+    template <typename FwdIt, typename T, typename C>
     FwdIt
     lower_bound(FwdIt first, FwdIt last, const T &value, C lessthan)
     {
         using DiffT = typename std::iterator_traits<FwdIt>::difference_type;
+
         FwdIt it;
         DiffT count = std::distance(first, last);
 
@@ -1142,13 +1130,13 @@ namespace ex30
         return first;
     }
 
-    template <class FwdIt, class T>
+    template <typename FwdIt, typename T>
     FwdIt
     lower_bound(FwdIt first, FwdIt last, const T &value)
     {
         return std::lower_bound(first, last, value, std::less<>{});
     }
-    // dex30
+
     void
     test()
     {
@@ -1163,7 +1151,6 @@ namespace ex31
     void
     test()
     {
-        // ex31
         std::vector<int> vec = {3, 7};
         for (int value : {1, 5, 9})
         {
@@ -1174,7 +1161,6 @@ namespace ex31
         }
         // The vector has remained sorted.
         assert((vec == std::vector{1, 3, 5, 7, 9}));
-        // dex31
     }
 } // namespace ex31
 
@@ -1183,7 +1169,6 @@ namespace ex32
     void
     test()
     {
-        // ex32
         std::vector<int> vec   = {2, 3, 3, 3, 4};
         auto             lower = std::lower_bound(vec.begin(), vec.end(), 3);
 
@@ -1206,7 +1191,6 @@ namespace ex32
         assert(*lower >= 3);
         assert(*upper > 3);
         assert(std::all_of(lower, upper, [](int v) { return v == 3; }));
-        // dex32
     }
 } // namespace ex32
 
@@ -1215,7 +1199,6 @@ namespace ex33
     void
     test()
     {
-        // ex33
         std::vector<int> vec = {1, 3, 3, 4, 6, 8};
 
         // Partition our vector so that all the non-3s are at the front
@@ -1228,14 +1211,12 @@ namespace ex33
         vec.erase(first_3, vec.end());
 
         assert((vec == std::vector{1, 4, 6, 8}));
-        // dex33
     }
 } // namespace ex33
 
 namespace ex34
 {
-    // ex34
-    template <class FwdIt, class T>
+    template <typename FwdIt, typename T>
     FwdIt
     remove(FwdIt first, FwdIt last, const T &value)
     {
@@ -1287,7 +1268,6 @@ namespace ex34
         auto last  = std::upper_bound(first, vec.end(), 3);
         vec.erase(first, last);
     }
-    // dex34
 } // namespace ex34
 
 namespace ex35
@@ -1295,22 +1275,19 @@ namespace ex35
     void
     test()
     {
-        // ex35
         std::vector<int> vec = {1, 2, 2, 3, 3, 3, 1, 3, 3};
 
         vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
 
         assert((vec == std::vector{1, 2, 3, 1, 3}));
-        // dex35
     }
 } // namespace ex35
 
 namespace ex36
 {
-    // ex36
     namespace my
     {
-        template <class BidirIt, class T>
+        template <typename BidirIt, typename T>
         BidirIt
         unstable_remove(BidirIt first, BidirIt last, const T &value)
         {
@@ -1344,20 +1321,18 @@ namespace ex36
 
         assert((vec == std::vector{4, 1, 8, 6}));
     }
-    // dex36
 } // namespace ex36
 
 namespace ex37
 {
-    // ex37
-    template <class T>
+    template <typename T>
     void
     destroy_at(T *p)
     {
         p->~T();
     }
 
-    template <class FwdIt>
+    template <typename FwdIt>
     void
     destroy(FwdIt first, FwdIt last)
     {
@@ -1366,9 +1341,8 @@ namespace ex37
             std::destroy_at(std::addressof(*first));
         }
     }
-    // dex37
-    // ex38
-    template <class It, class FwdIt>
+
+    template <typename It, typename FwdIt>
     FwdIt
     uninitialized_copy(It first, It last, FwdIt out)
     {
@@ -1407,18 +1381,17 @@ namespace ex37
         // Destroy three std::strings.
         std::destroy(sb, end);
     }
-    // dex38
 } // namespace ex37
 
 int
 main()
 {
-    ex1::test();
-    ex2::test();
-    ex3::test();
-    ex6::test();
-    ex7::test();
-    ex9::test();
+    ex01::test();
+    ex02::test();
+    ex03::test();
+    ex06::test();
+    ex07::test();
+    ex09::test();
     ex11::test();
     ex12::test();
     ex15::test();
