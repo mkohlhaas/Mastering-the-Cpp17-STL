@@ -13,6 +13,17 @@
 #include <utility>
 #include <vector>
 
+// classify each standard algorithm as:
+// - read-only
+// - write-only
+// - transformative
+// - permutative
+// - one-range
+// - two-range
+// - one-and-a-half range
+
+// Read-only range algorithms
+
 namespace ex01
 {
     void
@@ -41,6 +52,7 @@ namespace ex01
         [[maybe_unused]] auto c2 = std::count_if(std::begin(a), std::end(a) - 1, [](int) { return true; });
 
         // a "trivial" invocation: counting a range of length zero
+        // empty range -> compiler already knows the answer: 0
         [[maybe_unused]] auto c3 = std::count_if(std::begin(a), std::begin(a), [](int) { return true; });
     }
 } // namespace ex01
@@ -58,12 +70,16 @@ namespace ex02
         assert(std::distance(std::begin(lst), std::end(lst)) == 5);
         assert(std::distance(std::begin(flst), std::end(flst)) == 5);
 
+        // vector is a random access iterator
+        // gives negative value
         assert(std::distance(std::end(a), std::begin(a)) == -5);
 
-        //  The following line gives an "incorrect" answer!
-        // assert(std::distance(std::end(lst), std::begin(lst)) == 1);
+        // std::list is a bidirectional iterator
+        // The following line gives an "incorrect" answer!
+        assert(std::distance(std::end(lst), std::begin(lst)) == 1);
 
-        //  And this one just segfaults!
+        // std::forward_list is a forward iterator
+        // And this one just segfaults!
         // [[maybe_unused]] auto i = std::distance(std::end(flst), std::begin(flst));
     }
 } // namespace ex02
@@ -76,10 +92,11 @@ namespace ex03
         std::set<int> s{1, 2, 3, 10, 42, 99};
 
         // O(n): compare each element with 42
-        [[maybe_unused]] auto present = std::count(s.begin(), s.end(), 42);
+        // has to loop over all elements (no insight into underlying data structure)
+        [[maybe_unused]] auto present1 = std::count(s.begin(), s.end(), 42);
 
         // O(log n): ask the container to look up 42 itself
-        present = s.count(42);
+        [[maybe_unused]] auto present2 = s.count(42);
     }
 } // namespace ex03
 
@@ -93,7 +110,7 @@ namespace ex04
         {
             if (p(*first))
             {
-                return first;
+                return first; // short-circuiting (not going through the whole range)
             }
         }
         return last;
@@ -103,7 +120,7 @@ namespace ex04
     It
     find_if_not(It first, It last, U p)
     {
-        return std::find_if(first, last, [&](auto &&e) { return !p(e); });
+        return std::find_if(first, last, [&](auto &&e) { return not p(e); });
     }
 
     template <typename It, typename T>
@@ -186,9 +203,7 @@ namespace ex07
 
 namespace ex08
 {
-    template <typename T>
-    constexpr bool is_random_access_iterator_v =
-        std::is_base_of_v<std::random_access_iterator_tag, typename std::iterator_traits<T>::iterator_category>;
+    // mismatch
 
     template <typename It1, typename It2, typename B>
     auto
@@ -208,6 +223,12 @@ namespace ex08
     {
         return std::mismatch(first1, last1, first2, last2, std::equal_to<>{});
     }
+
+    // equal
+
+    template <typename T>
+    constexpr bool is_random_access_iterator_v =
+        std::is_base_of_v<std::random_access_iterator_tag, typename std::iterator_traits<T>::iterator_category>;
 
     template <typename It1, typename It2, typename B>
     bool
@@ -232,8 +253,11 @@ namespace ex08
     }
 } // namespace ex08
 
+// Shunting data with std::copy
+
 namespace ex09
 {
+    // copy is a one-and-a-half-range algorithm (end iterator of second range is not given)
     template <typename InIt, typename OutIt>
     OutIt
     copy(InIt first1, InIt last1, OutIt destination)
@@ -247,18 +271,22 @@ namespace ex09
         return destination;
     }
 
+    // copy can also be used for feeding data to an arbitrary "sink" function
+
     class putc_iterator : public boost::iterator_facade<putc_iterator,       // T
                                                         const putc_iterator, // value_type
                                                         std::output_iterator_tag>
     {
+      private:
         friend class boost::iterator_core_access;
 
         auto &
         dereference() const
         {
-            return *this;
+            return *this; // this iterator is its own proxy object!
         }
 
+        // increment doesn't do anything (noop)
         void
         increment()
         {
@@ -271,11 +299,10 @@ namespace ex09
         }
 
       public:
-        // This iterator is its own proxy object!
         void
         operator=(char ch) const
         {
-            putc(ch, stdout);
+            putc(ch, stdout); // this iterator is its own proxy object!
         }
     };
 
@@ -303,11 +330,13 @@ namespace ex11
         template <typename Container>
         class back_insert_iterator
         {
-            using CtrValueType = typename Container::value_type;
+          private:
+            using ContainerValueType = typename Container::value_type;
 
             Container *c;
 
           public:
+            // back_insert_iterator is an output_iterator
             using iterator_category = output_iterator_tag;
             using difference_type   = void;
             using value_type        = void;
@@ -337,14 +366,14 @@ namespace ex11
             }
 
             auto &
-            operator=(const CtrValueType &v)
+            operator=(const ContainerValueType &v)
             {
                 c->push_back(v);
                 return *this;
             }
 
             auto &
-            operator=(CtrValueType &&v)
+            operator=(ContainerValueType &&v)
             {
                 c->push_back(std::move(v));
                 return *this;
@@ -366,6 +395,9 @@ namespace ex11
 
         std::vector<char> dest;
         std::copy(s.begin(), s.end(), std::back_inserter(dest));
+        // Also possible because of CTAD (Class Template Argument Deduction).
+        // But cumbersome - too many characters - not recommended!
+        std::copy(s.begin(), s.end(), std::back_insert_iterator(dest));
         assert(dest.size() == 5);
     }
 } // namespace ex11
@@ -414,7 +446,8 @@ namespace ex12
             using value_type        = typename std::iterator_traits<It>::value_type;
             using pointer           = It;
             using reference         = std::conditional_t<std::is_reference_v<OriginalRefType>,
-                                                         std::remove_reference_t<OriginalRefType> &&, OriginalRefType>;
+                                                         std::remove_reference_t<OriginalRefType> &&, //
+                                                         OriginalRefType>;
 
             constexpr move_iterator() = default;
             constexpr explicit move_iterator(It it) : iter(std::move(it))
