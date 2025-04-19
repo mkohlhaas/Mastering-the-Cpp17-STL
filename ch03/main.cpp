@@ -395,12 +395,15 @@ namespace ex11
 
         std::vector<char> dest;
         std::copy(s.begin(), s.end(), std::back_inserter(dest));
+
         // Also possible because of CTAD (Class Template Argument Deduction).
         // But cumbersome - too many characters - not recommended!
         std::copy(s.begin(), s.end(), std::back_insert_iterator(dest));
-        assert(dest.size() == 5);
+        assert(dest.size() == 10);
     }
 } // namespace ex11
+
+// Variations on a theme - std::move and std::move_iterator
 
 namespace ex12
 {
@@ -418,6 +421,7 @@ namespace ex12
         decltype(auto)
         move(T &&t)
         {
+            // returns an rvalue (&&)
             return static_cast<remove_reference_t<T> &&>(t);
         }
 
@@ -427,17 +431,20 @@ namespace ex12
         {
             while (first1 != last1)
             {
-                *destination = std::move(*first1);
+                *destination = std::move(*first1); // move instead of copy
                 ++first1;
                 ++destination;
             }
             return destination;
         }
 
+        // wrapper around existing iterator It
         template <typename It>
         class move_iterator
         {
+          private:
             using OriginalRefType = typename std::iterator_traits<It>::reference;
+
             It iter;
 
           public:
@@ -445,9 +452,10 @@ namespace ex12
             using difference_type   = typename std::iterator_traits<It>::difference_type;
             using value_type        = typename std::iterator_traits<It>::value_type;
             using pointer           = It;
-            using reference         = std::conditional_t<std::is_reference_v<OriginalRefType>,
-                                                         std::remove_reference_t<OriginalRefType> &&, //
-                                                         OriginalRefType>;
+            using reference =
+                std::conditional_t<std::is_reference_v<OriginalRefType>,
+                                   std::remove_reference_t<OriginalRefType> &&, // make an rvalue out of reference
+                                   OriginalRefType>;
 
             constexpr move_iterator() = default;
             constexpr explicit move_iterator(It it) : iter(std::move(it))
@@ -470,12 +478,14 @@ namespace ex12
                 return *this;
             }
 
+            // returns wrapped-up iterator
             constexpr It
             base() const
             {
                 return iter;
             }
 
+            // deref returns an rvalue
             reference
             operator*()
             {
@@ -542,6 +552,7 @@ namespace ex12
         // I've omitted the definitions of non-member operators
         // == != < <= > >= + - ; can you fill them in?
 
+        // not necessary in practice (just use CTAD)
         template <typename InputIterator>
         auto
         make_move_iterator(InputIterator &c)
@@ -564,6 +575,7 @@ namespace ex12
             return t.base() - u.base();
         }
     } // namespace std
+
     void
     test()
     {
@@ -571,12 +583,18 @@ namespace ex12
         std::vector<std::string> output(2);
 
         // First approach: use the std::move algorithm
-        std::move(input.begin(), input.end(), output.begin());
+        std::move(input.begin(),
+                  input.end(), //
+                  output.begin());
 
-        // Second approach: use move_iterator
-        std::copy(std::move_iterator(input.begin()), std::move_iterator(input.end()), output.begin());
+        // Second approach: use copy with move_iterators
+        std::copy(std::move_iterator(input.begin()),
+                  std::move_iterator(input.end()), //
+                  output.begin());
     }
 } // namespace ex12
+
+// Complicated copying with std::transform
 
 namespace ex15
 {
@@ -586,6 +604,8 @@ namespace ex15
         std::vector<const char *> input = {"hello", "world"};
         std::vector<std::string>  output(2);
 
+        // input and output types do not be the same
+        // using implicit conversion
         std::copy(input.begin(), input.end(), output.begin());
 
         assert(output[0] == "hello");
@@ -595,14 +615,13 @@ namespace ex15
 
 namespace ex16
 {
-    // ex16
     template <typename InIt, typename OutIt, typename Unary>
     OutIt
     transform(InIt first1, InIt last1, OutIt destination, Unary op)
     {
         while (first1 != last1)
         {
-            *destination = op(*first1);
+            *destination = op(*first1); // function with one arg
             ++first1;
             ++destination;
         }
@@ -615,8 +634,8 @@ namespace ex16
         std::vector<std::string> input = {"hello", "world"};
         std::vector<std::string> output(2);
 
+        // It works for transforming in-place, too!
         std::transform(input.begin(), input.end(), output.begin(), [](std::string s) {
-            // It works for transforming in-place, too!
             std::transform(s.begin(), s.end(), s.begin(), ::toupper);
             return s;
         });
@@ -628,13 +647,17 @@ namespace ex16
 
 namespace ex17
 {
+    // could be described as a one-and-two-halves-range algorithm ;-)
+    // first1, last1 = one range
+    // first2        = half range
+    // destination   = half range
     template <typename InIt1, typename InIt2, typename OutIt, typename Binary>
     OutIt
     transform(InIt1 first1, InIt1 last1, InIt2 first2, OutIt destination, Binary op)
     {
         while (first1 != last1)
         {
-            *destination = op(*first1, *first2);
+            *destination = op(*first1, *first2); // function with two args
             ++first1;
             ++first2;
             ++destination;
@@ -651,12 +674,21 @@ namespace ex18
         std::vector<std::string> input = {"hello", "world"};
         std::vector<std::string> output(2);
 
-        // Third approach: use std::transform
-        std::transform(input.begin(), input.end(), output.begin(), std::move<std::string &>);
+        // Third approach of moving data: use std::transform
+        // Not recommended: Whenever you see an explicit specialization - those angle brackets after the template's
+        // name - that's an almost sure sign of very subtle and fragile code.
+        std::transform(input.begin(),
+                       input.end(),    //
+                       output.begin(), //
+                       std::move<std::string &>);
 
+        assert(input[0] == "");
+        assert(input[1] == "");
         assert(output[0] == "hello");
     }
 } // namespace ex18
+
+// Write-only range algorithms
 
 namespace ex19
 {
@@ -719,16 +751,83 @@ namespace ex19
     }
 } // namespace ex19
 
+// Algorithms that affect object lifetime
+
+namespace ex37
+{
+    template <typename T>
+    void
+    destroy_at(T *p)
+    {
+        p->~T();
+    }
+
+    template <typename FwdIt>
+    void
+    destroy(FwdIt first, FwdIt last)
+    {
+        for (; first != last; ++first)
+        {
+            std::destroy_at(std::addressof(*first));
+        }
+    }
+
+    template <typename It, typename FwdIt>
+    FwdIt
+    uninitialized_copy(It first, It last, FwdIt out)
+    {
+        using T       = typename std::iterator_traits<FwdIt>::value_type;
+        FwdIt old_out = out;
+
+        try
+        {
+            while (first != last)
+            {
+                ::new (static_cast<void *>(std::addressof(*out))) T(*first);
+                ++first;
+                ++out;
+            }
+            return out;
+        }
+        catch (...)
+        {
+            std::destroy(old_out, out);
+            throw;
+        }
+    }
+
+    void
+    test()
+    {
+        alignas(std::string) char b[5 * sizeof(std::string)];
+        std::string              *sb  = reinterpret_cast<std::string *>(b);
+        std::vector<const char *> vec = {"quick", "brown", "fox"};
+
+        // Construct three std::strings.
+        auto end = std::uninitialized_copy(vec.begin(), vec.end(), sb);
+
+        assert(end == sb + 3);
+
+        // Destroy three std::strings.
+        std::destroy(sb, end);
+    }
+} // namespace ex37
+
+// Our first permutative algorithm: std::sort
+
 namespace ex21
 {
     void
     test()
     {
         std::vector<int> v = {3, 1, 4, 1, 5, 9};
-        std::sort(v.begin(), v.end(), [](auto &&a, auto &&b) { return a % 7 < b % 7; });
+        std::sort(v.begin(), v.end(), //
+                  [](auto &&a, auto &&b) { return a % 7 < b % 7; });
         assert((v == std::vector{1, 1, 9, 3, 4, 5}));
     }
 } // namespace ex21
+
+// Swapping, reversing, and partitioning
 
 namespace ex22
 {
@@ -736,6 +835,7 @@ namespace ex22
     {
         class obj
         {
+          private:
             int v;
 
           public:
@@ -761,15 +861,19 @@ namespace ex22
     void
     test()
     {
-        int              i1 = 1, i2 = 2;
-        std::vector<int> v1 = {1}, v2 = {2};
-        my::obj          m1 = 1, m2 = 2;
-
         using std::swap;
 
-        swap(i1, i2); // calls std::swap<int>(int&, int&)
-        swap(v1, v2); // calls std::swap(vector&, vector&)
-        swap(m1, m2); // calls my::swap(obj&, obj&)
+        // calls std::swap<int>(int&, int&)
+        int i1 = 1, i2 = 2;
+        swap(i1, i2);
+
+        // calls std::swap(vector&, vector&)
+        std::vector<int> v1 = {1}, v2 = {2};
+        swap(v1, v2);
+
+        // calls my::swap(obj&, obj&)
+        my::obj m1 = 1, m2 = 2;
+        swap(m1, m2);
     }
 } // namespace ex22
 
@@ -800,6 +904,7 @@ namespace ex23
     {
         std::string s = "the quick brown fox jumps over the lazy dog";
         reverse_words_in_place(s);
+
         assert(s == "dog lazy the over jumps fox brown quick the");
     }
 } // namespace ex23
@@ -822,6 +927,7 @@ namespace ex24
                 {
                     break;
                 }
+
                 using std::swap;
                 swap(*first, *last);
                 ++first;
@@ -850,7 +956,6 @@ namespace ex24
                 }
 
                 using std::swap;
-
                 swap(*first, *last);
 
                 do
@@ -858,6 +963,7 @@ namespace ex24
                     ++first;
                 } while (first != last && p(*first));
             }
+
             return first;
         }
 
@@ -876,6 +982,7 @@ namespace ex25
 {
     namespace std
     {
+        using ::std::cout;
         using ::std::find_if;
         using ::std::find_if_not;
         using ::std::reverse_iterator;
@@ -902,174 +1009,40 @@ namespace ex25
         partition(BidirIt first, BidirIt last, Unary p)
         {
             first = std::find_if_not(first, last, p);
+            // std::cout << "first: " << *first << '\n';
 
             while (first != last)
             {
-                last = unrev(std::find_if(rev(last), rev(first), p));
+                last = unrev(std::find_if(rev(last), rev(first), p)); // both iterators need to be reversed
+                // std::cout << "last: " << *last << '\n';
                 if (first == last)
                 {
                     break;
                 }
+
                 using std::swap;
-                swap(*first++, *--last);
+                // std::cout << *first << " " << *last << '\n';
+                swap(*first++, *--last); // NOTE: pre-decrement on last
+
                 first = std::find_if_not(first, last, p);
             }
             return first;
         }
     } // namespace std
+
     void
     test()
     {
-        std::vector<int> v  = {3, 1, 4, 1, 5, 9, 2, 6, 5};
-        auto             it = std::partition(v.begin(), v.end(), [](int x) { return x % 2 == 0; });
+        std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
+
+        auto it = std::partition(v.begin(), v.end(), [](int x) { return x % 2 == 0; });
+
         assert(it == v.begin() + 3);
         assert((v == std::vector{6, 2, 4, 1, 5, 9, 1, 3, 5}));
     }
 } // namespace ex25
 
-namespace ex26
-{
-#define make_heap MakeHeap
-#define push_heap PushHeap
-#define pop_heap  PopHeap
-#define sort_heap SortHeap
-
-    template <typename RandomIt>
-    void
-    push_heap(RandomIt a, RandomIt b)
-    {
-        auto child = ((b - 1) - a);
-        while (child != 0)
-        {
-            auto parent = (child - 1) / 2;
-            if (a[child] < a[parent])
-            {
-                return; // max-heap property has been restored
-            }
-            std::iter_swap(a + child, a + parent);
-            child = parent;
-        }
-    }
-
-    template <typename RandomIt>
-    void
-    pop_heap(RandomIt a, RandomIt b)
-    {
-        using DistanceT = decltype(b - a);
-
-        std::iter_swap(a, b - 1);
-
-        DistanceT parent        = 0;
-        DistanceT new_heap_size = ((b - 1) - a);
-
-        while (true)
-        {
-            auto leftchild  = 2 * parent + 1;
-            auto rightchild = 2 * parent + 2;
-            if (leftchild >= new_heap_size)
-            {
-                return;
-            }
-            auto biggerchild = leftchild;
-            if (rightchild < new_heap_size && a[leftchild] < a[rightchild])
-            {
-                biggerchild = rightchild;
-            }
-            if (a[biggerchild] < a[parent])
-            {
-                return; // max-heap property has been restored
-            }
-            std::iter_swap(a + parent, a + biggerchild);
-            parent = biggerchild;
-        }
-    }
-
-    template <typename RandomIt>
-    void
-    make_heap(RandomIt a, RandomIt b)
-    {
-        for (auto it = a; it != b;)
-        {
-            push_heap(a, ++it);
-        }
-    }
-
-    template <typename RandomIt>
-    void
-    sort_heap(RandomIt a, RandomIt b)
-    {
-        for (auto it = b; it != a; --it)
-        {
-            pop_heap(a, it);
-        }
-    }
-
-    template <typename RandomIt>
-    void
-    sort(RandomIt a, RandomIt b)
-    {
-        make_heap(a, b);
-        sort_heap(a, b);
-    }
-
-#undef make_heap
-#undef push_heap
-#undef pop_heap
-#undef sort_heap
-
-    void
-    test()
-    {
-        std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
-
-        ex26::sort(v.begin(), v.end());
-        assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
-
-        ex26::sort(v.begin() + 2, v.begin() + 2);
-        assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
-
-        ex26::sort(v.begin() + 2, v.begin() + 3);
-        assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
-    }
-} // namespace ex26
-
-namespace ex27
-{
-    namespace std
-    {
-        using ::std::distance;
-        using ::std::inplace_merge;
-        using ::std::vector;
-
-        template <typename RandomIt>
-        void
-        sort(RandomIt a, RandomIt b)
-        {
-            auto n = std::distance(a, b);
-            if (n >= 2)
-            {
-                auto mid = a + n / 2;
-                std::sort(a, mid);
-                std::sort(mid, b);
-                std::inplace_merge(a, mid, b);
-            }
-        }
-    } // namespace std
-    void
-    test()
-    {
-        std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
-
-        std::sort(v.begin(), v.end());
-        assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
-
-        std::sort(v.begin() + 2, v.begin() + 2);
-        assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
-
-        std::sort(v.begin() + 2, v.begin() + 3);
-        assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
-    }
-} // namespace ex27
+// Rotation and permutation
 
 namespace ex28
 {
@@ -1098,11 +1071,25 @@ namespace ex28
         void
         test()
         {
-            std::vector<int> v    = {1, 2, 3, 4, 5, 6};
-            auto             five = std::find(v.begin(), v.end(), 5);
-            auto             one  = std::rotate(v.begin(), five, v.end());
-            assert((v == std::vector{5, 6, 1, 2, 3, 4}));
-            assert(*one == 1);
+            {
+                std::vector<int> v = {1, 2, 3, 4, 5, 6};
+
+                auto five = std::find(v.begin(), v.end(), 5);
+                auto one  = std::rotate(v.begin(), five, v.end());
+
+                assert((v == std::vector{5, 6, 1, 2, 3, 4}));
+                assert(*one == 1);
+            }
+
+            {
+                std::vector<int> v = {1, 2, 3, 4, 5, 6};
+
+                auto four = std::find(v.begin(), v.end(), 4);
+                auto one  = std::rotate(v.begin(), four, v.end());
+
+                assert((v == std::vector{4, 5, 6, 1, 2, 3}));
+                assert(*one == 1);
+            }
         }
     } // namespace std
 } // namespace ex28
@@ -1112,15 +1099,15 @@ namespace ex29
     void
     test()
     {
+
         std::vector<int>              p = {10, 20, 30};
         std::vector<std::vector<int>> results;
 
         // Collect the permutations of these three elements.
-        for (int i = 0; i < 6; ++i)
+        do
         {
             results.push_back(p);
-            std::next_permutation(p.begin(), p.end());
-        }
+        } while (std::next_permutation(p.begin(), p.end()));
 
         assert((results == std::vector<std::vector<int>>{
                                {10, 20, 30},
@@ -1133,11 +1120,189 @@ namespace ex29
     }
 } // namespace ex29
 
+// Heaps and heapsort
+
+namespace ex26
+{
+#define make_heap MakeHeap
+#define push_heap PushHeap
+#define pop_heap  PopHeap
+#define sort_heap SortHeap
+
+    // https://www.cs.dartmouth.edu/~cs10/notes14.html
+    // Heap represented as array:
+    //
+    // max-heap property: each element of the range at index i
+    // will be at least as great as either of the elements at
+    // indices 2i+1 and 2i+2
+    //
+    // This implies that the greatest element of all will be at index 0.
+    //
+    // prerequisite: range [a,b-1) is already a max-heap
+    template <typename RandomIt>
+    void
+    push_heap(RandomIt a, RandomIt b)
+    {
+        auto child = ((b - 1) - a);
+
+        while (child != 0)
+        {
+            auto parent = (child - 1) / 2;
+            if (a[child] < a[parent])
+            {
+                return;                            // max-heap property has been restored
+            }
+            std::iter_swap(a + child, a + parent); // swaps elements at the two iterators
+            child = parent;
+        }
+    }
+
+    template <typename RandomIt>
+    void
+    make_heap(RandomIt a, RandomIt b)
+    {
+        for (auto it = a; it != b;)
+        {
+            push_heap(a, ++it);
+        }
+    }
+
+    template <typename RandomIt>
+    void
+    pop_heap(RandomIt a, RandomIt b)
+    {
+        using DistanceT = decltype(b - a);
+
+        std::iter_swap(a, b - 1);
+
+        DistanceT parent        = 0;
+        DistanceT new_heap_size = ((b - 1) - a);
+
+        while (true)
+        {
+            auto leftchild  = 2 * parent + 1;
+            auto rightchild = 2 * parent + 2;
+            if (leftchild >= new_heap_size)
+            {
+                return;
+            }
+
+            auto biggerchild = leftchild;
+            if (rightchild < new_heap_size && a[leftchild] < a[rightchild])
+            {
+                biggerchild = rightchild;
+            }
+
+            if (a[biggerchild] < a[parent])
+            {
+                return; // max-heap property has been restored
+            }
+
+            std::iter_swap(a + parent, a + biggerchild);
+            parent = biggerchild;
+        }
+    }
+
+    template <typename RandomIt>
+    void
+    sort_heap(RandomIt a, RandomIt b)
+    {
+        for (auto it = b; it != a; --it)
+        {
+            pop_heap(a, it);
+        }
+    }
+
+    template <typename RandomIt>
+    void
+    sort(RandomIt a, RandomIt b)
+    {
+        make_heap(a, b);
+        sort_heap(a, b);
+    }
+
+    void
+    test()
+    {
+        std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
+
+        ex26::sort(v.begin(), v.end());
+        assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
+    }
+
+#undef make_heap
+#undef push_heap
+#undef pop_heap
+#undef sort_heap
+} // namespace ex26
+
+// Merges and mergesort
+
+namespace ex27
+{
+    namespace std
+    {
+        using ::std::distance;
+        using ::std::inplace_merge;
+        using ::std::vector;
+
+        template <class Iter>
+        void
+        merge_sort(Iter a, Iter b)
+        {
+            if (b - a > 1)
+            {
+                Iter middle = a + (b - a) / 2;
+                merge_sort(a, middle);
+                merge_sort(middle, b);
+                std::inplace_merge(a, middle, b); // inplace_merge function allocates a buffer for its own use!!!
+                                                  // std::merge(a,b,c,d,o) is the non-allocating merge algorithm
+            }
+        }
+
+        template <typename RandomIt>
+        void
+        sort(RandomIt a, RandomIt b)
+        {
+            auto n = std::distance(a, b);
+            if (n >= 2)
+            {
+                auto mid = a + n / 2;
+                std::sort(a, mid);
+                std::sort(mid, b);
+                std::inplace_merge(a, mid, b);
+            }
+        }
+    } // namespace std
+
+    void
+    test()
+    {
+        {
+            std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
+            std::sort(v.begin(), v.end());
+            assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
+        }
+
+        {
+            std::vector<int> v = {3, 1, 4, 1, 5, 9, 2, 6, 5};
+            std::merge_sort(v.begin(), v.end());
+            assert((v == std::vector{1, 1, 2, 3, 4, 5, 5, 6, 9}));
+        }
+    }
+} // namespace ex27
+
+// Searching and inserting in a sorted array with std::lower_bound
+
 namespace ex30
 {
+    // The standard algorithm that implements binary search is called `lower_bound`.
+    // Prerequisite: already sorted range (according to cmp - typically <=).
+    // Returns an iterator to the first element in the range that is not less than the given `value`.
+    // Will point at the place where `value` should go, if you want to insert it.
     template <typename FwdIt, typename T, typename C>
     FwdIt
-    lower_bound(FwdIt first, FwdIt last, const T &value, C lessthan)
+    lower_bound(FwdIt first, FwdIt last, const T &value, C cmp)
     {
         using DiffT = typename std::iterator_traits<FwdIt>::difference_type;
 
@@ -1146,10 +1311,11 @@ namespace ex30
 
         while (count > 0)
         {
-            DiffT step = count / 2;
-            it         = first;
-            std::advance(it, step);
-            if (lessthan(*it, value))
+            DiffT step = count / 2; // do a binary search
+
+            it = first;
+            std::advance(it, step); // it += step
+            if (cmp(*it, value))
             {
                 ++it;
                 first = it;
@@ -1173,9 +1339,20 @@ namespace ex30
     void
     test()
     {
-        std::vector<std::string> v  = {"hello", "world"};
-        auto                     it = ex30::lower_bound(v.begin(), v.end(), "literally");
-        assert(it == v.begin() + 1);
+        {
+            std::vector<int> v = {1, 2, 3, 4, 6, 7, 8, 9};
+
+            auto it = ex30::lower_bound(v.begin(), v.end(), 5);
+            assert(*it == 6);
+            assert(it == v.begin() + 4);
+        }
+
+        {
+            std::vector<std::string> v = {"hello", "world"};
+
+            auto it = ex30::lower_bound(v.begin(), v.end(), "literally");
+            assert(it == v.begin() + 1);
+        }
     }
 } // namespace ex30
 
@@ -1185,6 +1362,8 @@ namespace ex31
     test()
     {
         std::vector<int> vec = {3, 7};
+
+        // inserting values
         for (int value : {1, 5, 9})
         {
             // Find the appropriate insertion point...
@@ -1192,6 +1371,7 @@ namespace ex31
             // ...and insert our value there.
             vec.insert(it, value);
         }
+
         // The vector has remained sorted.
         assert((vec == std::vector{1, 3, 5, 7, 9}));
     }
@@ -1202,12 +1382,18 @@ namespace ex32
     void
     test()
     {
-        std::vector<int> vec   = {2, 3, 3, 3, 4};
-        auto             lower = std::lower_bound(vec.begin(), vec.end(), 3);
+        // std::lower_bound and std::upper_bound will give you a half-open range [lower, upper)
+        // containing nothing but instances of the given value.
+
+        std::vector<int> vec = {2, 3, 3, 3, 4};
+
+        auto lower = std::lower_bound(vec.begin(), vec.end(), 3);
 
         // First approach:
         // upper_bound's interface is identical to lower_bound's.
         auto upper = std::upper_bound(vec.begin(), vec.end(), 3);
+        assert(*lower == 3);
+        assert(*upper == 4);
 
         // Second approach:
         // We don't need to binary-search the whole array the second time.
@@ -1227,6 +1413,16 @@ namespace ex32
     }
 } // namespace ex32
 
+// Deleting from a sorted array with std::remove_if
+
+// So how do we erase items from a range? Well, we can't! All we can do is erase items from a
+// container; and the algorithms of the STL do not deal in containers. So what we ought to be
+// looking for is a way to rearrange the values of a range so that the "removed" items will wind
+// up somewhere predictable, so that we can quickly erase them all from the underlying
+// container (using some means other than an STL algorithm).
+//
+// Leads to the ERASE-REMOVE-IDIOM!
+
 namespace ex33
 {
     void
@@ -1244,6 +1440,8 @@ namespace ex33
         vec.erase(first_3, vec.end());
 
         assert((vec == std::vector{1, 4, 6, 8}));
+
+        // BUT!!! stable_partition is one of those few STL algorithms that allocates a temporary buffer on the heap!
     }
 } // namespace ex33
 
@@ -1310,6 +1508,8 @@ namespace ex35
     {
         std::vector<int> vec = {1, 2, 2, 3, 3, 3, 1, 3, 3};
 
+        // std::unique(a,b) takes a range and for each set of consecutive equivalent items
+        // removes all but the first of them.
         vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
 
         assert((vec == std::vector{1, 2, 3, 1, 3}));
@@ -1355,66 +1555,6 @@ namespace ex36
         assert((vec == std::vector{4, 1, 8, 6}));
     }
 } // namespace ex36
-
-namespace ex37
-{
-    template <typename T>
-    void
-    destroy_at(T *p)
-    {
-        p->~T();
-    }
-
-    template <typename FwdIt>
-    void
-    destroy(FwdIt first, FwdIt last)
-    {
-        for (; first != last; ++first)
-        {
-            std::destroy_at(std::addressof(*first));
-        }
-    }
-
-    template <typename It, typename FwdIt>
-    FwdIt
-    uninitialized_copy(It first, It last, FwdIt out)
-    {
-        using T       = typename std::iterator_traits<FwdIt>::value_type;
-        FwdIt old_out = out;
-        try
-        {
-            while (first != last)
-            {
-                ::new (static_cast<void *>(std::addressof(*out))) T(*first);
-                ++first;
-                ++out;
-            }
-            return out;
-        }
-        catch (...)
-        {
-            std::destroy(old_out, out);
-            throw;
-        }
-    }
-
-    void
-    test()
-    {
-        alignas(std::string) char b[5 * sizeof(std::string)];
-        std::string              *sb = reinterpret_cast<std::string *>(b);
-
-        std::vector<const char *> vec = {"quick", "brown", "fox"};
-
-        // Construct three std::strings.
-        auto end = std::uninitialized_copy(vec.begin(), vec.end(), sb);
-
-        assert(end == sb + 3);
-
-        // Destroy three std::strings.
-        std::destroy(sb, end);
-    }
-} // namespace ex37
 
 int
 main()
