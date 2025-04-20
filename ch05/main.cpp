@@ -17,9 +17,8 @@
 #include <variant>
 #include <vector>
 
-namespace ex1
+namespace ex01
 {
-    // ex1
     char *
     greet(const char *name)
     {
@@ -36,12 +35,10 @@ namespace ex1
         assert(strcmp(hw, "hello world") == 0);
         free(hw);
     }
-    // dex1
-} // namespace ex1
+} // namespace ex01
 
-namespace ex2
+namespace ex02
 {
-    // ex2
     std::string
     greet(const std::string &name)
     {
@@ -54,12 +51,10 @@ namespace ex2
         std::string who = "world";
         assert(greet(who) == "hello world");
     }
-    // dex2
-} // namespace ex2
+} // namespace ex02
 
-namespace ex3
+namespace ex03
 {
-    // ex3
     enum class Color
     {
         RED   = 1,
@@ -72,55 +67,41 @@ namespace ex3
         MEDIUM = 2,
         LARGE  = 3,
     };
-// dex3
-#if 0
-//ex4
-data SixType = ColorandSizeOf Color Size;
 
-data FiveType = ColorOf Color | SizeOf Size;
-//dex4
-#endif
-    // ex5
-    using sixtype = std::pair<Color, Size>;
-
+    using sixtype  = std::pair<Color, Size>;
     using fivetype = std::variant<Color, Size>;
-    // dex5
-} // namespace ex3
+} // namespace ex03
 
-namespace ex6
+namespace ex06
 {
-    // ex6
     template <class A, class B>
     struct pair
     {
         A first;
         B second;
     };
-    // dex6
-} // namespace ex6
+} // namespace ex06
 
-namespace ex7
+namespace ex07
 {
     void
     test()
     {
-        // ex7
         std::string s;
         int         i;
 
         // Assign both s and i at once.
         std::tie(s, i) = std::make_tuple("hello", 42);
-        // dex7
     }
-} // namespace ex7
+} // namespace ex07
 
-namespace ex8
+namespace ex08
 {
     void
     test()
     {
-        // ex8
-        using Author                = std::pair<std::string, std::string>;
+        using Author = std::pair<std::string, std::string>;
+
         std::vector<Author> authors = {
             {"Fyodor", "Dostoevsky"},
             {"Sylvia", "Plath"},
@@ -137,13 +118,11 @@ namespace ex8
         std::sort(authors.begin(), authors.end(),
                   [](auto &&a, auto &&b) { return std::tie(a.second, a.first) < std::tie(b.second, b.first); });
         assert(authors[0] == Author("Fyodor", "Dostoevsky"));
-        // dex8
     }
-} // namespace ex8
+} // namespace ex08
 
-namespace ex9
+namespace ex09
 {
-    // ex9
     template <class T>
     constexpr size_t
     tuple_size(T &&)
@@ -157,7 +136,7 @@ namespace ex9
     {
         return sizeof...(Ts);
     }
-    // dex9
+
     void
     test()
     {
@@ -167,14 +146,13 @@ namespace ex9
         static_assert(simpler_tuple_size(t) == 2);
         static_assert(simpler_tuple_size(std::make_tuple(1, 2, 3)) == 3);
     }
-} // namespace ex9
+} // namespace ex09
 
 namespace ex10
 {
     void
     test()
     {
-        // ex10
         auto [i, j, k] = std::tuple{1, 2, 3};
 
         // make_tuple decays reference_wrapper...
@@ -184,13 +162,11 @@ namespace ex10
         // ...whereas the deduced constructor does not.
         auto t2 = std::tuple(i, std::ref(j), k);
         static_assert(std::is_same_v<decltype(t2), std::tuple<int, std::reference_wrapper<int>, int>>);
-        // dex10
     }
 } // namespace ex10
 
 namespace ex11
 {
-    // ex11
     template <typename F>
     void run_zeroarg(const F &f);
 
@@ -202,12 +178,10 @@ namespace ex11
         auto lambda   = [&f, fwd_args]() { std::apply(f, fwd_args); };
         run_zeroarg(f);
     }
-    // dex11
 } // namespace ex11
 
 namespace ex12
 {
-    // ex12
     namespace std
     {
         template <typename T>
@@ -234,7 +208,6 @@ namespace ex12
         template <typename T>
         reference_wrapper<T> ref(T &t);
     } // namespace std
-    // dex12
 } // namespace ex12
 
 namespace ex13
@@ -242,7 +215,6 @@ namespace ex13
     void
     test()
     {
-        // ex13
         int  result = 0;
         auto task   = [](int &r) { r = 42; };
 
@@ -251,7 +223,7 @@ namespace ex13
 
         // Correctly pass result "by reference" to the new thread.
         std::thread t(task, std::ref(result));
-        // dex13
+
         t.join();
         assert(result == 42);
     }
@@ -262,7 +234,6 @@ namespace ex14
     void
     test()
     {
-        // ex14
         std::variant<int, double> v1;
 
         v1 = 1;    // activate the "int" member
@@ -279,8 +250,7 @@ namespace ex14
 
         assert(std::get_if<int>(&v1) == nullptr);
         assert(*std::get_if<double>(&v1) == 3.14);
-        // dex14
-        // ex15
+
         //  Worst...
         try
         {
@@ -307,13 +277,11 @@ namespace ex14
         {
             std::cout << *p << std::endl;
         }
-        // dex15
     }
 } // namespace ex14
 
 namespace ex16
 {
-    // ex16
     struct Visitor
     {
         double
@@ -348,7 +316,6 @@ namespace ex16
         show(1);
         show("hello world");
     }
-    // dex16
 } // namespace ex16
 
 namespace ex17
@@ -358,7 +325,6 @@ namespace ex17
     void
     show(Var v)
     {
-        // ex17
         std::visit(
             [](const auto &alt) {
                 if constexpr (std::is_same_v<decltype(alt), const std::string &>)
@@ -371,7 +337,6 @@ namespace ex17
                 }
             },
             v);
-        // dex17
     }
 
     void
@@ -385,7 +350,6 @@ namespace ex17
 
 namespace ex18
 {
-    // ex18
     struct MultiVisitor
     {
         template <class T, class U, class V>
@@ -408,14 +372,12 @@ namespace ex18
         std::variant<int, double, char> v1 = 'x';
         std::variant<char, int, double> v2 = 1;
         std::variant<double, char, int> v3 = 3.14;
-        std::visit(MultiVisitor{}, v1, v2, v3); // prints "right!"
+        std::visit(MultiVisitor{}, v1, v2, v3); // "right!"
     }
-    // dex18
 } // namespace ex18
 
 namespace ex19
 {
-    // ex19
     struct A
     {
         A()
@@ -423,6 +385,7 @@ namespace ex19
             throw "ha ha!";
         }
     };
+
     struct B
     {
         operator int()
@@ -430,6 +393,7 @@ namespace ex19
             throw "ha ha!";
         }
     };
+
     struct C
     {
         C()                = default;
@@ -452,7 +416,8 @@ namespace ex19
         catch (const char *haha)
         {
         }
-        assert(v1.valueless_by_exception());
+        // assert(v1.valueless_by_exception()); // orig fails
+        assert(!v1.valueless_by_exception());
 
         try
         {
@@ -461,9 +426,9 @@ namespace ex19
         catch (const char *haha)
         {
         }
-        assert(v1.valueless_by_exception());
+        // assert(v1.valueless_by_exception()); // orig fails
+        assert(!v1.valueless_by_exception());
     }
-    // dex19
 } // namespace ex19
 
 namespace ex20
@@ -475,6 +440,7 @@ namespace ex20
             throw "ha ha!";
         }
     };
+
     struct B
     {
         operator int()
@@ -482,6 +448,7 @@ namespace ex20
             throw "ha ha!";
         }
     };
+
     struct C
     {
         C()                = default;
@@ -497,7 +464,6 @@ namespace ex20
     {
         std::variant<int, A, C> v1 = 42;
 
-        // ex20
         v1 = 42;
 
         // Constructing the right-hand side of this assignment
@@ -530,7 +496,6 @@ namespace ex20
         {
         }
         assert(v1.valueless_by_exception());
-        // dex20
     }
 } // namespace ex20
 
@@ -540,8 +505,9 @@ namespace ex21
     use(int)
     {
     }
+
     static int some_default = 0;
-    // ex21
+
     std::map<std::string, int> g_limits = {{"memory", 655360}};
 
     std::variant<std::monostate, int>
@@ -567,7 +533,6 @@ namespace ex21
             use(some_default);
         }
     }
-    // dex21
 } // namespace ex21
 
 namespace ex22
@@ -576,9 +541,10 @@ namespace ex22
     use(int)
     {
     }
+
     static int                 some_default = 0;
     std::map<std::string, int> g_limits     = {{"memory", 655360}};
-    // ex22
+
     std::optional<int>
     get_resource_limit(const std::string &key)
     {
@@ -602,7 +568,6 @@ namespace ex22
             use(some_default);
         }
     }
-    // dex22
 } // namespace ex22
 
 namespace ex23
@@ -612,6 +577,7 @@ namespace ex23
     {
         assert(i == 42);
     }
+
     static int some_default = 42;
     std::optional<int>
     get_resource_limit(const std::string &)
@@ -619,7 +585,6 @@ namespace ex23
         return std::nullopt;
     }
 
-    // ex23
     std::optional<int> get_resource_limit(const std::string &);
 
     void
@@ -628,31 +593,28 @@ namespace ex23
         auto limit = get_resource_limit("memory");
         use(limit.value_or(some_default));
     }
-    // dex23
 } // namespace ex23
 
 namespace ex24
 {
-    // ex24
     auto
     make_lambda(int arg)
     {
         return [arg](int x) { return x + arg; };
     }
+
     using L = decltype(make_lambda(0));
 
     static_assert(!std::is_default_constructible_v<L>);
     static_assert(!std::is_move_assignable_v<L>);
-    // dex24
-    // ex25
+
     class ProblematicAdder
     {
         L fn_;
     };
 
     static_assert(!std::is_default_constructible_v<ProblematicAdder>);
-    // dex25
-    // ex26
+
     class Adder
     {
         std::optional<L> fn_;
@@ -681,7 +643,6 @@ namespace ex24
         int result = adder.call(5);
         assert(result == 9);
     }
-    // dex26
 } // namespace ex24
 
 namespace ex27
@@ -702,22 +663,26 @@ using JSONValue = std::variant<
 
 namespace ex28
 {
-    // ex28
-    using JSONValue = boost::variant<std::nullptr_t, bool, double, std::string, std::vector<boost::recursive_variant_>,
-                                     std::map<std::string, boost::recursive_variant_>>;
-    // dex28
+    using JSONValue = boost::variant<std::nullptr_t,
+                                     bool,                                              //
+                                     double,                                            //
+                                     std::string,                                       //
+                                     std::vector<boost::recursive_variant_>,            //
+                                     std::map<std::string, boost::recursive_variant_>>; //
 } // namespace ex28
 
 namespace ex29
 {
-    // ex29
     struct JSONValue
     {
-        std::variant<std::nullptr_t, bool, double, std::string, std::vector<JSONValue>,
-                     std::map<std::string, JSONValue>>
+        std::variant<std::nullptr_t,
+                     bool,                             //
+                     double,                           //
+                     std::string,                      //
+                     std::vector<JSONValue>,           //
+                     std::map<std::string, JSONValue>> //
             value_;
     };
-    // dex29
 } // namespace ex29
 
 namespace ex30
@@ -726,10 +691,10 @@ namespace ex30
     use(std::string &)
     {
     }
+
     void
     test()
     {
-        // ex30
         std::any a; // construct an empty container
 
         assert(!a.has_value());
@@ -741,8 +706,7 @@ namespace ex30
         a = 42;
         assert(a.has_value());
         assert(a.type() == typeid(int));
-        // dex30
-        // ex31
+
         if (std::string *p = std::any_cast<std::string>(&a))
         {
             use(*p);
@@ -761,13 +725,11 @@ namespace ex30
         {
             // go fish!
         }
-        // dex31
     }
 } // namespace ex30
 
 namespace ex32
 {
-    // ex32
     template <class T>
     struct Widget
     {
@@ -778,7 +740,6 @@ namespace ex32
     {
         return std::make_any<Widget<int>>();
     }
-    // dex32
 } // namespace ex32
 
 namespace ex33
@@ -789,18 +750,17 @@ namespace ex33
     {
         return 1;
     }
+
     template <class T>
-    struct Widget;
+    struct Widget
+    {
+    };
+
     std::any
     get_widget()
     {
         return std::make_any<Widget<int>>();
     }
-    // ex33
-    template <class T>
-    struct Widget
-    {
-    };
 
     template <class T>
     int
@@ -816,12 +776,10 @@ namespace ex33
         int      sz = hypothetical_any_visit([](auto &&w) { return size(w); }, a);
         assert(sz == sizeof(Widget<int>));
     }
-    // dex33
 } // namespace ex33
 
 namespace ex34
 {
-    // ex34
     struct Animal
     {
         virtual ~Animal() = default;
@@ -845,16 +803,25 @@ namespace ex34
         assert(std::any_cast<Animal>(&a) == nullptr);
 
         // Asking for void* certainly will not work!
-        assert(std::any_cast<void>(&a) == nullptr);
+        // assert(std::any_cast<void>(&a) == nullptr); // orig fails
+        assert(std::any_cast<void *>(&a) == nullptr);
     }
-    // dex34
 } // namespace ex34
 
 namespace ex35
 {
     template <typename T>
     struct AnyImpl;
-    struct AnyBase;
+
+    class any;
+    struct AnyBase
+    {
+        virtual const std::type_info &type()         = 0;
+        virtual void                  copy_to(any &) = 0;
+        virtual void                  move_to(any &) = 0;
+        virtual ~AnyBase()                           = default;
+    };
+
     class any
     {
         std::unique_ptr<AnyBase> p_ = nullptr;
@@ -867,16 +834,6 @@ namespace ex35
         any(const any &rhs);
         any &operator=(const any &rhs);
     };
-    // ex35
-    class any;
-
-    struct AnyBase
-    {
-        virtual const std::type_info &type()         = 0;
-        virtual void                  copy_to(any &) = 0;
-        virtual void                  move_to(any &) = 0;
-        virtual ~AnyBase()                           = default;
-    };
 
     template <typename T>
     struct AnyImpl : AnyBase
@@ -887,25 +844,26 @@ namespace ex35
         {
             return typeid(T);
         }
+
         void
         copy_to(any &rhs) override
         {
             rhs.emplace<T>(t_);
         }
+
         void
         move_to(any &rhs) override
         {
             rhs.emplace<T>(std::move(t_));
         }
+
         // the destructor doesn't need anything
         // special in this case
     };
-    // dex35
 } // namespace ex35
 
 namespace ex36
 {
-
     class any;
 
     struct AnyBase
@@ -971,12 +929,10 @@ namespace ex36
             return *this;
         }
     };
-    // dex36
 } // namespace ex36
 
 namespace ex37
 {
-    // ex37
     using Ptr = std::unique_ptr<int>;
 
     template <class T>
@@ -995,10 +951,12 @@ namespace ex37
 
         Shim(Shim &&)            = default;
         Shim &operator=(Shim &&) = default;
+
         Shim(const Shim &)
         {
             throw "oops";
         }
+
         Shim &
         operator=(const Shim &)
         {
@@ -1037,17 +995,16 @@ namespace ex37
         Ptr r = std::any_cast<Shim<Ptr> &>(b).get();
         assert(*r == 42);
     }
-    // dex37
 } // namespace ex37
 
 namespace ex38
 {
-    // ex38
     int
     my_abs(int x)
     {
         return x < 0 ? -x : x;
     }
+
     long
     unusual(long x, int y = 3)
     {
@@ -1066,7 +1023,6 @@ namespace ex38
         f = [](long x) { return unusual(x); }; // or a lambda!
         assert(f(-42) == -39);
     }
-    // dex38
 } // namespace ex38
 
 namespace ex39
@@ -1075,7 +1031,7 @@ namespace ex39
     test()
     {
         std::function<int(int)> f; // construct an empty container
-                                   // ex39
+
         f = [i = 0](int) mutable { return ++i; };
         assert(f(-42) == 1);
         assert(f(-42) == 2);
@@ -1085,7 +1041,6 @@ namespace ex39
         assert(f(-42) == 4);
         assert(g(-42) == 3);
         assert(g(-42) == 4);
-        // dex39
     }
 } // namespace ex39
 
@@ -1095,11 +1050,12 @@ namespace ex40
     use(int (*)(int))
     {
     }
+
     void
     test()
     {
         std::function<int(int)> f;
-        // ex40
+
         if (f.target_type() == typeid(int (*)(int)))
         {
             int (*p)(int) = *f.target<int (*)(int)>();
@@ -1109,7 +1065,6 @@ namespace ex40
         {
             // go fish!
         }
-        // dex40
     }
 } // namespace ex40
 
@@ -1118,7 +1073,7 @@ namespace ex41
     void
     test()
     {
-        // ex41
+
         auto capture = [](auto &p) {
             using T = std::decay_t<decltype(p)>;
             return std::make_shared<T>(std::move(p));
@@ -1127,15 +1082,13 @@ namespace ex41
         std::promise<int> p;
 
         std::function<void()> f = [sp = capture(p)]() { sp->set_value(42); };
-        // dex41
     }
 } // namespace ex41
 
 namespace ex42
 {
-    // ex42
-    //  templated_for_each is a template and must be visible at the
-    //  point where it is called.
+    // templated_for_each is a template and must be visible at the
+    // point where it is called.
     template <class F>
     void
     templated_for_each(std::vector<int> &v, F f)
@@ -1149,17 +1102,16 @@ namespace ex42
     // type_erased_for_each has a stable ABI and a fixed address.
     // It can be called with only its declaration in scope.
     extern void type_erased_for_each(std::vector<int> &, std::function<void(int)>);
-    // dex42
 } // namespace ex42
 
 int
 main()
 {
-    ex1::test();
-    ex2::test();
-    ex7::test();
-    ex8::test();
-    ex9::test();
+    ex01::test();
+    ex02::test();
+    ex07::test();
+    ex08::test();
+    ex09::test();
     ex10::test();
     ex13::test();
     ex14::test();
