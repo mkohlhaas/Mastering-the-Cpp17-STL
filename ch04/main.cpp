@@ -12,16 +12,22 @@
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
-namespace ex1
-{
-#pragma GCC diagnostic push
+// Use std::vector unless you have a specific reason to need something else!
+
 #pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+
+// The notion of ownership
+
+namespace ex01
+{
     struct B
     {
     };
-    // ex1
+
     struct owning_A
     {
         B b_;
@@ -44,18 +50,14 @@ namespace ex1
         // a2 doesn't own b.
         non_owning_A a2{b};
     }
-// dex1
-#pragma GCC diagnostic pop
-} // namespace ex1
+} // namespace ex01
 
-namespace ex2
+namespace ex02
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
     struct B
     {
     };
-    // ex2
+
     struct owning_A
     {
         B *b_;
@@ -101,42 +103,22 @@ namespace ex2
         // a2 doesn't own *b.
         non_owning_A a2{b};
     }
-// dex2
-#pragma GCC diagnostic pop
-} // namespace ex2
+} // namespace ex02
 
-namespace ex3
-{
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-    // ex3
-    void
-    dont_do_this()
-    {
-        // This variable takes up 4 megabytes of stack space ---
-        // enough to blow your stack and cause a segmentation fault!
-        int arr[1'000'000];
-    }
+// The simplest container: std::array<T, N>
 
-    void
-    dont_do_this_either()
-    {
-        // Changing it into a C++ std::array doesn't fix the problem.
-        std::array<int, 1'000'000> arr;
-    }
-// dex3
-#pragma GCC diagnostic pop
-} // namespace ex3
-
-namespace ex4
+namespace ex04
 {
     void
     test()
     {
-        if (true)
         {
-            // ex4
-            std::string c_style[4] = {"the", "quick", "brown", "fox"};
+            std::string c_style[4] = {
+                "the",
+                "quick",
+                "brown",
+                "fox",
+            };
             assert(c_style[2] == "brown");
             assert(std::size(c_style) == 4);
             assert(std::distance(std::begin(c_style), std::end(c_style)) == 4);
@@ -151,15 +133,19 @@ namespace ex4
 
             // Comparison isn't supported; you have to use a standard algorithm.
             // Worse, operator== does the "wrong" thing: address comparison!
-            assert(c_style != other);
+            assert(c_style != +other);
             assert(std::equal(c_style, c_style + 4, other, other + 4));
             assert(!std::lexicographical_compare(c_style, c_style + 4, other, other + 4));
-            // dex4
         }
-        if (true)
+
         {
-            // ex5
-            std::array<std::string, 4> arr = {{"the", "quick", "brown", "fox"}};
+            // double-brace syntax (one for std::array, one for inner T[N])
+            std::array<std::string, 4> arr = {{
+                "the",
+                "quick",
+                "brown",
+                "fox",
+            }};
             assert(arr[2] == "brown");
 
             // .begin(), .end(), and .size() are all provided.
@@ -178,20 +164,20 @@ namespace ex4
             assert(&arr != &other); // The arrays have different addresses...
             assert(arr == other);   // ...but still compare lexicographically equal.
             assert(arr >= other);   // Relational operators are also supported.
-            // dex5
         }
     }
-} // namespace ex4
+} // namespace ex04
 
-namespace ex6
+namespace ex06
 {
-    // ex6
-    //  You can't return a C-style array from a function.
-    //  auto cross_product(const int (&a)[3], const int (&b)[3]) -> int[3];
+    //  You can't return a C-style array from a function!
+    // auto cross_product(const int (&a)[3], const int (&b)[3]) -> int[3];
 
-    // But you can return a std::array.
-    auto
-    cross_product(const std::array<int, 3> &a, const std::array<int, 3> &b) -> std::array<int, 3>
+    // But you can return a std::array!
+    using Vec3 = std::array<int, 3>;
+
+    Vec3
+    cross_product(const Vec3 &a, const Vec3 &b)
     {
         return {{
             a[1] * b[2] - a[2] * b[1],
@@ -199,22 +185,22 @@ namespace ex6
             a[0] * b[1] - a[1] * b[0],
         }};
     }
-    // dex6
+
     void
     test()
     {
-        using Vec3 = std::array<int, 3>;
         Vec3 a{{2, 3, 4}};
         Vec3 b{{5, 6, 7}};
+
         auto c = cross_product(a, b);
         assert((c == Vec3{{-3, 6, -3}}));
         assert((c < Vec3{{-3, 6, -2}}));
     }
-} // namespace ex6
+} // namespace ex06
 
-namespace ex7
+namespace ex07
 {
-    // ex7
+    // better to wrap it up in a class
     struct Vec3
     {
         int x, y, z;
@@ -235,7 +221,8 @@ namespace ex7
         return !(a == b);
     }
 
-    // Operators < <= > >= don't make sense for Vec3
+    // Operators < <= > >= don't make sense for Vec3.
+    // But where automatically defined for std::array.
 
     Vec3
     cross_product(const Vec3 &a, const Vec3 &b)
@@ -246,7 +233,7 @@ namespace ex7
             a.x * b.y - a.y * b.x,
         };
     }
-    // dex7
+
     void
     test()
     {
@@ -255,12 +242,32 @@ namespace ex7
         auto c = cross_product(a, b);
         assert((c == Vec3{-3, 6, -3}));
     }
-} // namespace ex7
+} // namespace ex07
 
-namespace ex8
+namespace ex03
 {
+    void
+    dont_do_this()
+    {
+        // This variable takes up 4 megabytes of stack space ---
+        // enough to blow your stack and cause a segmentation fault!
+        int arr[1'000'000];
+    }
 
-    // ex8
+    void
+    dont_do_this_either()
+    {
+        // Changing it into a C++ std::array doesn't fix the problem.
+        std::array<int, 1'000'000> arr;
+    }
+} // namespace ex03
+
+// The workhorse: std::vector<T>
+
+// Resizing a std::vector
+
+namespace ex08
+{
     template <typename T>
     inline void
     destroy_n_elements(T *p, size_t n)
@@ -274,6 +281,7 @@ namespace ex8
     template <typename T>
     class vector
     {
+      private:
         T     *ptr_      = nullptr;
         size_t size_     = 0;
         size_t capacity_ = 0;
@@ -334,7 +342,7 @@ namespace ex8
             free(ptr_);
         }
     };
-    // dex8
+
     void
     test()
     {
@@ -344,11 +352,10 @@ namespace ex8
         vec2.reserve(10);
         vec2.reserve(100);
     }
-} // namespace ex8
+} // namespace ex08
 
-namespace ex9
+namespace ex09
 {
-
     template <typename T>
     class vector
     {
@@ -372,10 +379,10 @@ namespace ex9
             // "What if malloc fails?"
             T *new_ptr = (T *)malloc(c * sizeof(T));
 
-            // ex9
-            //  If the elements can be moved without risking
-            //  an exception, then we'll move the elements.
-            std::conditional_t<std::is_nothrow_move_constructible_v<T>, std::move_iterator<T *>, T *> first(ptr_);
+            // If the elements can be moved without risking
+            // an exception, then we'll move the elements.
+            std::conditional_t<std::is_nothrow_move_constructible_v<T>, std::move_iterator<T *>, T *> //
+                first(ptr_); // first is an iterator (either a move iterator or simply a pointer)
 
             try
             {
@@ -394,7 +401,6 @@ namespace ex9
             free(ptr_);
             ptr_      = new_ptr;
             capacity_ = c;
-            // dex9
         }
 
         ~vector()
@@ -413,19 +419,14 @@ namespace ex9
         vec2.reserve(10);
         vec2.reserve(100);
     }
-} // namespace ex9
+} // namespace ex09
 
 namespace ex10
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wunknown-warning-option"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     void
     test()
     {
-        // ex10
+        // classic cases of iterator invalidation
         std::vector<int> v = {3, 1, 4};
 
         auto iter = v.begin();
@@ -437,8 +438,7 @@ namespace ex10
         // will be reading garbage from a dangling iterator!
         v = std::vector{3, 1, 4};
         std::copy(v.begin(), v.end(), std::back_inserter(v));
-        // dex10
-        // ex11
+
         auto end = v.end();
         for (auto it = v.begin(); it != end; ++it)
         {
@@ -462,48 +462,46 @@ namespace ex10
             }
         }
 
-        // ...But it's much more efficient to use the
-        // erase-remove idiom.
+        // But it's much more efficient to use the erase-remove idiom!
         v.erase(std::remove_if(v.begin(), v.end(), [](auto &&elt) { return elt == 4; }), v.end());
-        // dex11
     }
-#pragma GCC diagnostic pop
 } // namespace ex10
+
+// Inserting and erasing in a std::vector
 
 namespace ex12
 {
     void
     test()
     {
-        // ex12
         std::vector<int> v = {1, 2};
         std::vector<int> w = {5, 6};
 
         // Insert a single element.
-        v.insert(v.begin() + 1, 3);
+        v.insert(v.begin() + 1, 3); // position, value
         assert((v == std::vector{1, 3, 2}));
 
         // Insert n copies of a single element.
-        v.insert(v.end() - 1, 3, 4);
+        v.insert(v.end() - 1, 3, 4); // insert three fours (position, size, value)
         assert((v == std::vector{1, 3, 4, 4, 4, 2}));
 
         // Insert a whole range of elements.
-        v.insert(v.begin() + 3, w.begin(), w.end());
+        v.insert(v.begin() + 3, w.begin(), w.end()); // position, iterator begin, iterator end
         assert((v == std::vector{1, 3, 4, 5, 6, 4, 4, 2}));
 
         // Insert a braced list of elements.
-        v.insert(v.begin(), {7, 8});
+        v.insert(v.begin(), {7, 8}); // position, initializer_list
         assert((v == std::vector{7, 8, 1, 3, 4, 5, 6, 4, 4, 2}));
-        // dex12
     }
 } // namespace ex12
+
+// Pitfalls with vector<bool>
 
 namespace ex13
 {
     void
     test()
     {
-        // ex13
         std::vector<bool> vb = {true, false, true, false};
 
         // vector<bool>::reference has one public member function:
@@ -511,12 +509,14 @@ namespace ex13
         assert(vb[3] == true);
 
         // The following line won't compile!
-        // bool& oops = vb[0];
+        // bool &oops = vb[0];
 
         auto ref = vb[0];
         assert((!std::is_same_v<decltype(ref), bool>));
         assert(sizeof vb[0] > sizeof(bool));
 
+        // Code using vector<bool> is not only subtle but sometimes non-portable as well.
+        // I advise avoiding vector<bool> if you can:
         if (sizeof std::as_const(vb)[0] == sizeof(bool))
         {
             puts("Your library vendor is libstdc++ or Visual Studio");
@@ -525,21 +525,24 @@ namespace ex13
         {
             puts("Your library vendor is libc++");
         }
-        // dex13
     }
 } // namespace ex13
 
+// Pitfalls with non-noexcept move constructors
+
 namespace ex14
 {
-    // ex14
     struct Bad
     {
         int x = 0;
+
         Bad() = default;
+
         Bad(const Bad &)
         {
             puts("copy Bad");
         }
+
         Bad(Bad &&)
         {
             puts("move Bad");
@@ -548,12 +551,16 @@ namespace ex14
 
     struct Good
     {
-        int x  = 0;
+        int x = 0;
+
         Good() = default;
+
         Good(const Good &)
         {
             puts("copy Good");
         }
+
+        // move constructor is noexcept - only difference to Bad
         Good(Good &&) noexcept
         {
             puts("move Good");
@@ -571,13 +578,13 @@ namespace ex14
         std::string x;
         Bad         y;
     };
-    // dex14
-    // ex15
+
     template <class T>
     void
     test_resizing()
     {
         std::vector<T> vec(1);
+
         // Force a reallocation on the vector.
         vec.resize(vec.capacity() + 1);
     }
@@ -585,132 +592,188 @@ namespace ex14
     void
     test()
     {
-        test_resizing<Good>();
-        test_resizing<Bad>();
-        test_resizing<ImplicitlyGood>();
-        test_resizing<ImplicitlyBad>();
+        // A good rule of thumb is: Whenever you declare your own move constructor
+        // or swap function, make sure you declare it noexcept.
+
+        test_resizing<Good>(); // move Good
+        test_resizing<Bad>();  // copy Bad
+
+        // same behavior
+        test_resizing<ImplicitlyGood>(); // move Good
+        test_resizing<ImplicitlyBad>();  // copy Bad
     }
-    // dex15
 } // namespace ex14
 
-namespace ex16
-{
-    void
-    test()
-    {
-        // ex16
-        std::list<int> a = {3, 6};
-        std::list<int> b = {1, 2, 3, 5, 6};
-
-        a.merge(b);
-        assert(b.empty());
-        assert((a == std::list{1, 2, 3, 3, 5, 6, 6}));
-        // dex16
-    }
-} // namespace ex16
-
-namespace ex17
-{
-    void
-    test()
-    {
-        // ex17
-        std::list<int> lst   = {3, 1, 4, 1, 5, 9, 2, 6, 5};
-        auto           begin = std::next(lst.begin(), 2);
-        auto           end   = std::next(lst.end(), -2);
-
-        // Sort just the range [begin, end)
-        std::list<int> sub;
-        sub.splice(sub.begin(), lst, begin, end);
-        sub.sort();
-        lst.splice(end, sub);
-        assert(sub.empty());
-
-        assert((lst == std::list{3, 1, 1, 2, 4, 5, 9, 6, 5}));
-        // dex17
-    }
-} // namespace ex17
-
-namespace ex18
-{
-    void
-    test()
-    {
-        // ex18
-        std::stack<int> stk;
-        stk.push(3);
-        stk.push(1);
-        stk.push(4);
-        assert(stk.top() == 4);
-        stk.pop();
-        assert(stk.top() == 1);
-        stk.pop();
-        assert(stk.top() == 3);
-        // dex18
-        // ex19
-        std::stack<int> a, b;
-        a.push(3);
-        a.push(1);
-        a.push(4);
-        b.push(2);
-        b.push(7);
-        assert(a != b);
-
-        assert(a.top() < b.top()); // that is, 4 < 7
-        assert(a > b);             // because 3 > 2
-        // dex19
-    }
-} // namespace ex18
+// The speedy hybrid: std::deque<T>
 
 namespace ex20
 {
     void
     test()
     {
-        // ex20
-        std::vector<int> vec   = {1, 2, 3, 4};
-        std::deque<int>  deq   = {1, 2, 3, 4};
-        int             *vec_p = &vec[2];
-        int             *deq_p = &deq[2];
+        std::vector<int> vec = {1, 2, 3, 4};
+        std::deque<int>  deq = {1, 2, 3, 4};
+
+        int *vec_p = &vec[2];
+        int *deq_p = &deq[2];
+
         for (int i = 0; i < 1000; ++i)
         {
             vec.push_back(i);
             deq.push_back(i);
         }
-        assert(vec_p != &vec[2]);
-        assert(deq_p == &deq[2]);
-        // dex20
+
+        assert(vec_p != &vec[2]); //    reallocations happened
+        assert(deq_p == &deq[2]); // no reallocations happened
     }
 } // namespace ex20
+
+// A particular set of skills: std::list<T>
+
+namespace ex17
+{
+    void
+    test()
+    {
+        std::list<int> lst = {3, 1, 4, 1, 5, 9, 2, 6, 5};
+
+        auto begin = std::next(lst.begin(), 2); // std::next like std::advance but returns iterator
+        auto end   = std::next(lst.end(), -2);
+
+        assert(*begin == 4);
+        assert(*end == 6);
+
+        // lst.sort() can only sort the entire container, instead of taking a
+        // sub-range the way std::sort does.
+
+        // workaround: sort just the range [begin, end)
+        std::list<int> sub;
+        sub.splice(sub.begin(), lst, begin, end); // splice transfers elements from one list to another
+        assert((lst == std::list{3, 1, 6, 5}));
+        assert((sub == std::list{4, 1, 5, 9, 2}));
+        sub.sort();
+        assert((sub == std::list{1, 2, 4, 5, 9}));
+        lst.splice(end, sub); // insertions happen before end
+        assert((lst == std::list{3, 1, 1, 2, 4, 5, 9, 6, 5}));
+        assert(sub.empty());
+    }
+} // namespace ex17
+
+// What are the special skills of std::list?
+
+namespace ex16
+{
+    // std::list         is a doubly-linked list
+    // std::forward_list is a singly-linked list
+
+    // As with std::list, you should avoid using forward_list at all unless you are in need of
+    // its particular set of skills.
+
+    void
+    test()
+    {
+        std::list<int> a = {1, 3, 5, 7};
+        std::list<int> b = {2, 4, 6, 8};
+
+        a.merge(b);
+        assert(b.empty());
+        assert((a == std::list{1, 2, 3, 4, 5, 6, 7, 8}));
+    }
+} // namespace ex16
+
+// Abstracting with std::stack<T> and std::queue<T>
+
+namespace ex18
+{
+    void
+    test()
+    {
+        {
+            // stack: LIFO (last in, first out)
+
+            std::stack<int> stk;
+            stk.push(3);
+            stk.push(1);
+            stk.push(4);
+
+            assert(stk.top() == 4);
+            stk.pop();
+            assert(stk.top() == 1);
+            stk.pop();
+            assert(stk.top() == 3);
+            stk.pop();
+            assert(stk.empty());
+
+            std::stack<int> a;
+            a.push(3);
+            a.push(1);
+            a.push(4);
+
+            std::stack<int> b;
+            b.push(2);
+            b.push(7);
+
+            assert(a != b);
+            assert(a.top() < b.top()); // that is, 4 < 7
+            assert(a > b);             // because 3 > 2
+        }
+        {
+            // queue: FIFI (first in, first out)
+            // In STL queue pushes on the back and pops from the front (as in the real world).
+
+            std::queue<int> q;
+            q.push(3);
+            q.push(1);
+            q.push(4);
+
+            assert(q.front() == 3);
+            q.pop();
+            assert(q.front() == 1);
+            q.pop();
+            assert(q.front() == 4);
+            q.pop();
+            assert(q.empty());
+        }
+    }
+} // namespace ex18
+
+// The useful adaptor: std::priority_queue<T>
 
 namespace ex21
 {
     void
     test()
     {
-        // ex21
-        std::priority_queue<int>                                   pq1;
-        std::priority_queue<int, std::vector<int>, std::greater<>> pq2;
+        std::priority_queue<int>                                   max_pq;
+        std::priority_queue<int, std::vector<int>, std::greater<>> min_pq;
 
         for (int v : {3, 1, 4, 1, 5, 9})
         {
-            pq1.push(v);
-            pq2.push(v);
+            max_pq.push(v);
+            min_pq.push(v);
         }
 
-        assert(pq1.top() == 9); // max-heap by default
-        assert(pq2.top() == 1); // min-heap by choice
-        // dex21
+        assert(max_pq.top() == 9); // max-heap by default
+        assert(min_pq.top() == 1); // min-heap by choice
     }
 } // namespace ex21
+
+// The trees: std::set<T> and std::map<K, V>
+
+// std::map and std::set, being based on trees of pointers,
+// are so cache-unfriendly that you should avoid them by default
+// and prefer to use std::unordered_map and std::unordered_set instead.
 
 namespace ex22
 {
     void
     test()
     {
-        // ex22
+        // s.count(v) will only ever return 0 or 1, because the set's elements are deduplicated.
+        // This makes s.count(v) a handy synonym for a set-membership operation.
+
         std::set<int> s;
+
         for (int i : {3, 1, 4, 1, 5})
         {
             s.insert(i);
@@ -725,7 +788,6 @@ namespace ex22
         s.erase(it); // erase *it, which is 1
 
         assert((s == std::set{3, 5}));
-        // dex22
     }
 } // namespace ex22
 
@@ -734,17 +796,16 @@ namespace ex23
     void
     test()
     {
-        // ex23
         std::set<int> s;
+
         auto [it1, b1] = s.insert(1);
         assert(*it1 == 1 && b1 == true);
 
         auto [it2, b2] = s.insert(2);
         assert(*it2 == 2 && b2 == true);
 
-        auto [it3, b3] = s.insert(1); // again
-        assert(*it3 == 1 && b3 == false);
-        // dex23
+        auto [it3, b3] = s.insert(1);
+        assert(*it3 == 1 && b3 == false); // insertion failed
     }
 } // namespace ex23
 
@@ -753,84 +814,42 @@ namespace ex24
     void
     test()
     {
-        // ex24
+        // std::map as "just a thin wrapper around a std::set of pairs.
+
         std::map<std::string, std::string> m;
-        m["hello"] = "world";
+
+        m["hello"] = "world"; // pair in set is {"hello", "world"}
         m["quick"] = "brown";
         m["hello"] = "dolly";
         assert(m.size() == 2);
-        // dex24
-        // ex25
-        assert(m["literally"] == "");
-        assert(m.size() == 3);
-        // dex25
-        // ex26
-        //  Confusingly, "value_type" refers to a whole key-value pair.
-        //  The types K and V are called "key_type" and "mapped_type",
-        //  respectively.
-        using Pair = decltype(m)::value_type;
 
+        // When you index into a size-zero map with m[42], the map helpfully
+        // inserts the key-value pair {42, {}} into itself and returns a
+        // reference to the second element of that pair!
+        assert(m["literally"] == ""); // second element is default constructed
+        assert(m.size() == 3);
+
+        //  Confusingly, "value_type" refers to a whole key-value pair.
+        //  The types K and V are called "key_type" and "mapped_type", respectively.
+        using Pair = decltype(m)::value_type; // std::pair<const std::string, std::string>
+
+        // find queries non-mutatively (can't use [])
         if (m.find("hello") == m.end())
         {
             m.insert(Pair{"hello", "dolly"});
-
             // ...or equivalently...
             m.emplace("hello", "dolly");
         }
-        // dex26
     }
 } // namespace ex24
 
-namespace ex27
-{
-    void
-    test()
-    {
-        // ex27
-        std::multimap<std::string, std::string> mm;
-        mm.emplace("hello", "world");
-        mm.emplace("quick", "brown");
-        mm.emplace("hello", "dolly");
-        assert(mm.size() == 3);
-
-        // Key-value pairs are stored in sorted order.
-        // Pairs with identical keys are guaranteed to be
-        // stored in the order in which they were inserted.
-        auto it    = mm.begin();
-        using Pair = decltype(mm)::value_type;
-        assert(*(it++) == Pair("hello", "world"));
-        assert(*(it++) == Pair("hello", "dolly"));
-        assert(*(it++) == Pair("quick", "brown"));
-        // dex27
-    }
-} // namespace ex27
-
-namespace ex28
-{
-    void
-    test()
-    {
-        // ex28
-        std::multimap<std::string, std::string> mm = {
-            {"hello", "world"},
-            {"quick", "brown"},
-            {"hello", "dolly"},
-        };
-        assert(mm.count("hello") == 2);
-        mm.erase("hello");
-        assert(mm.count("hello") == 0);
-        // dex28
-    }
-} // namespace ex28
+// A note about transparent comparators
+//
+// https://www.cppstories.com/2019/05/heterogeneous-lookup-cpp14/
+// https://www.cppstories.com/2021/heterogeneous-access-cpp20/
 
 namespace ex29
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wunknown-warning-option"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-    // ex29
     struct MagicLess
     {
         using is_transparent = std::true_type;
@@ -851,11 +870,12 @@ namespace ex29
         // The STL provides std::less<> as a synonym for MagicLess.
         std::map<std::string, std::string, std::less<>> m2;
 
+        // The find member function specifically checks for the member is_transparent
+        // and changes its behavior accordingly.
+
         // Now 'find' no longer constructs a std::string!
         auto it = m2.find("hello");
     }
-// dex29
-#pragma GCC diagnostic pop
 } // namespace ex29
 
 namespace ex30
@@ -867,43 +887,108 @@ namespace ex30
             {"hello", "world"},
             {"quick", "brown"},
         };
-        // ex30
+
+        // The member function erase does not check is_transparent!
+        // workaround for heterogeneous comparison during deletion:
         auto [begin, end] = m.equal_range("hello");
         m.erase(begin, end);
-        // dex30
+
         assert(m.count("hello") == 0);
         assert(m.size() == 1);
     }
 } // namespace ex30
+
+// Oddballs: std::multiset<T> and std::multimap<K, V>
+
+namespace ex27
+{
+    void
+    test()
+    {
+        std::multimap<std::string, std::string> mm;
+        mm.emplace("hello", "world");
+        mm.emplace("quick", "brown");
+        mm.emplace("hello", "dolly");
+        assert(mm.size() == 3);
+
+        // Key-value pairs are stored in sorted order.
+        // Pairs with identical keys are guaranteed to be
+        // stored in the order in which they were inserted.
+        auto it    = mm.begin();
+        using Pair = decltype(mm)::value_type;
+        assert(*(it++) == Pair("hello", "world"));
+        assert(*(it++) == Pair("hello", "dolly"));
+        assert(*(it++) == Pair("quick", "brown"));
+    }
+} // namespace ex27
+
+namespace ex28
+{
+    void
+    test()
+    {
+        std::multimap<std::string, std::string> mm = {
+            {"hello", "world"},
+            {"quick", "brown"},
+            {"hello", "dolly"},
+        };
+        assert(mm.count("hello") == 2);
+
+        // erases all "hello"s
+        mm.erase("hello");
+        assert(mm.count("hello") == 0);
+    }
+} // namespace ex28
+
+// Moving elements without moving them
 
 namespace ex31
 {
     void
     test()
     {
-        // ex31
-        std::map<std::string, std::string> m = {
-            {"hello", "world"},
-            {"quick", "brown"},
-        };
-        std::map<std::string, std::string> otherm = {
-            {"hello", "dolly"},
-            {"sad", "clown"},
-        };
+        {
+            std::map<std::string, std::string> m1 = {
+                {"hello", "world"},
+                {"quick", "brown"},
+            };
 
-        // This should look familiar!
-        m.merge(otherm);
+            std::map<std::string, std::string> m2 = {
+                {"hello", "dolly"},
+                {"sad", "clown"},
+            };
 
-        assert((otherm == decltype(m){
-                              {"hello", "dolly"},
+            // exising keys are not updated (contrary to e.g. Pyhton)
+            m1.merge(m2);
+
+            assert((m1 == decltype(m1){
+                              {"hello", "world"},
+                              {"quick", "brown"},
+                              {"sad", "clown"},
                           }));
+            assert((m2 == decltype(m1){{"hello", "dolly"}}));
+        }
 
-        assert((m == decltype(m){
-                         {"hello", "world"},
-                         {"quick", "brown"},
-                         {"sad", "clown"},
-                     }));
-        // dex31
+        {
+            std::map<std::string, std::string> m1 = {
+                {"hello", "world"},
+                {"quick", "brown"},
+            };
+
+            std::map<std::string, std::string> m2 = {
+                {"hello", "dolly"},
+                {"sad", "clown"},
+            };
+
+            m2.merge(m1);
+
+            assert((m1 == decltype(m1){{"hello", "world"}}));
+            assert((m2 == decltype(m1){
+                              {"hello", "dolly"},
+                              {"sad", "clown"},
+                              {"quick", "brown"},
+                          }));
+        }
     }
 } // namespace ex31
 
@@ -912,38 +997,39 @@ namespace ex32
     void
     test()
     {
-        // ex32
-        std::map<std::string, std::string> m = {
+        // transferring elements with extract and insert
+        std::map<std::string, std::string> m1 = {
             {"hello", "world"},
             {"quick", "brown"},
         };
-        std::map<std::string, std::string> otherm = {
+
+        std::map<std::string, std::string> m2 = {
             {"hello", "dolly"},
             {"sad", "clown"},
         };
 
-        using Pair = decltype(m)::value_type;
+        using Pair = decltype(m1)::value_type; // std::pair<const std::string, std::string>>
 
         // Insertion may succeed...
-        auto nh1 = otherm.extract("sad");
+        auto nh1 = m2.extract("sad");                           // extract "sad" from map and give it to a node handle
         assert(nh1.key() == "sad" && nh1.mapped() == "clown");
-        auto [it2, inserted2, nh2] = m.insert(std::move(nh1));
+
+        auto [it2, inserted2, nh2] = m1.insert(std::move(nh1)); // insert a node handle into map
         assert(*it2 == Pair("sad", "clown") && inserted2 == true && nh2.empty());
 
         // ...or be blocked by an existing element.
-        auto nh3 = otherm.extract("hello");
+        auto nh3 = m2.extract("hello");
         assert(nh3.key() == "hello" && nh3.mapped() == "dolly");
-        auto [it4, inserted4, nh4] = m.insert(std::move(nh3));
+        auto [it4, inserted4, nh4] = m1.insert(std::move(nh3));
         assert(*it4 == Pair("hello", "world") && inserted4 == false && !nh4.empty());
 
         // Overwriting an existing element is a pain.
-        m.insert_or_assign(nh4.key(), nh4.mapped());
+        m1.insert_or_assign(nh4.key(), nh4.mapped());
 
         // It is often easiest just to delete the element that's
         // blocking our desired insertion.
-        m.erase(it4);
-        m.insert(std::move(nh4));
-        // dex32
+        m1.erase(it4);
+        m1.insert(std::move(nh4));
     }
 } // namespace ex32
 
@@ -952,7 +1038,8 @@ namespace ex33
     void
     test()
     {
-        // ex33
+        // You can extract, manipulate, and reinsert a key without ever copying or moving its actual data!
+
         std::map<std::string, std::string> m = {
             {"hello", "world"},
             {"quick", "brown"},
@@ -960,21 +1047,26 @@ namespace ex33
         assert(m.begin()->first == "hello");
         assert(std::next(m.begin())->first == "quick");
 
-        // Upper-case the {"quick", "brown"} mapping, with
-        // absolutely no memory allocations anywhere.
+        // Upper-case the {"quick", "brown"} mapping, with absolutely no memory allocations anywhere.
         auto nh = m.extract("quick");
         std::transform(nh.key().begin(), nh.key().end(), nh.key().begin(), ::toupper);
         m.insert(std::move(nh));
 
         assert(m.begin()->first == "QUICK");
         assert(std::next(m.begin())->first == "hello");
-        // dex33
     }
 } // namespace ex33
 
+// The hashes: std::unordered_set<T> and std::unordered_map<K, V>
+
+// The std::unordered_set class template represents a chained hash table, i.e. a fixed-size array of "buckets",
+// each bucket containing a singly linked list of data elements.
+
+// std::unordered_map<K, V> is to std::unordered_set<T> as std::map<K, V> is to std::set<T>, i.e. it looks exactly
+// the same in memory, except that it stores key-value pairs instead of just keys.
+
 namespace ex34
 {
-    // ex34
     class Widget
     {
       public:
@@ -982,7 +1074,7 @@ namespace ex34
         virtual int  GetHashValue() const;
     };
 
-    struct myhash
+    struct MyHash
     {
         size_t
         operator()(const Widget *w) const
@@ -991,7 +1083,7 @@ namespace ex34
         }
     };
 
-    struct myequal
+    struct MyEqual
     {
         bool
         operator()(const Widget *a, const Widget *b) const
@@ -1000,20 +1092,19 @@ namespace ex34
         }
     };
 
-    std::unordered_set<Widget *, myhash, myequal> s;
-    // dex34
+    std::unordered_set<Widget *, MyHash, MyEqual> s;
 } // namespace ex34
 
 int
 main()
 {
-    ex1::test();
-    ex2::test();
-    ex4::test();
-    ex6::test();
-    ex7::test();
-    ex8::test();
-    ex9::test();
+    ex01::test();
+    ex02::test();
+    ex04::test();
+    ex06::test();
+    ex07::test();
+    ex08::test();
+    ex09::test();
     ex12::test();
     ex13::test();
     ex14::test();
