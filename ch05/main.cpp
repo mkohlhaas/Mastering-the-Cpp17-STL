@@ -986,6 +986,7 @@ namespace ex35
     template <typename T>
     struct AnyImpl;
 
+    // concept
     class any;
     struct AnyBase
     {
@@ -996,17 +997,21 @@ namespace ex35
         virtual ~AnyBase() = default;
     };
 
+    // cp. https://en.cppreference.com/w/cpp/utility/any
+    // only subset implemented
     class any
     {
       private:
         std::unique_ptr<AnyBase> p_ = nullptr;
 
       public:
+        // modifiers
         template <typename T, typename... Args>
         std::decay_t<T> &emplace(Args &&...args);
 
         void reset() noexcept;
 
+        // observer
         const std::type_info &type() const;
 
         any(const any &rhs);
@@ -1014,10 +1019,12 @@ namespace ex35
         any &operator=(const any &rhs);
     };
 
+    // model (implementation)
     template <typename T>
     struct AnyImpl : AnyBase
     {
         T t_;
+
         const std::type_info &
         type()
         {
@@ -1043,8 +1050,11 @@ namespace ex35
 
 namespace ex36
 {
+    // more complete implementation
+
     class any;
 
+    // concept
     struct AnyBase
     {
         virtual const std::type_info &type()         = 0;
@@ -1053,6 +1063,7 @@ namespace ex36
         virtual ~AnyBase()                           = default;
     };
 
+    // model (implementation)
     template <typename T>
     struct AnyImpl : AnyBase
     {
@@ -1062,9 +1073,9 @@ namespace ex36
         void                  move_to(any &rhs) override;
     };
 
-    // ex36
     class any
     {
+      private:
         std::unique_ptr<AnyBase> p_ = nullptr;
 
       public:
@@ -1109,6 +1120,8 @@ namespace ex36
         }
     };
 } // namespace ex36
+
+// std::any and copyability
 
 namespace ex37
 {
@@ -1176,6 +1189,10 @@ namespace ex37
     }
 } // namespace ex37
 
+// Again with the type erasure: std::function
+
+// std::function is the standard vocabulary type for passing functions between functions
+
 namespace ex38
 {
     int
@@ -1215,9 +1232,13 @@ namespace ex39
         assert(f(-42) == 1);
         assert(f(-42) == 2);
 
-        auto g = f;
+        auto g = f; // f is copied to g!
+
+        // f has its state ...
         assert(f(-42) == 3);
         assert(f(-42) == 4);
+
+        // ... and so does g
         assert(g(-42) == 3);
         assert(g(-42) == 4);
     }
@@ -1235,39 +1256,26 @@ namespace ex40
     {
         std::function<int(int)> f;
 
-        if (f.target_type() == typeid(int (*)(int)))
+        // f.target_type():
+        // "That said, I have never seen a use-case for these methods in real life."
+        if (f.target_type() == typeid(int (*)(int)))   // will fail
         {
-            int (*p)(int) = *f.target<int (*)(int)>();
-            use(p);
+            int (*p)(int) = *f.target<int (*)(int)>(); // extract function ...
+            use(p);                                    // ... and use it
         }
         else
         {
-            // go fish!
+            std::cout << "line " << __LINE__ << ": go fish" << std::endl;
         }
     }
 } // namespace ex40
 
-namespace ex41
-{
-    void
-    test()
-    {
-
-        auto capture = [](auto &p) {
-            using T = std::decay_t<decltype(p)>;
-            return std::make_shared<T>(std::move(p));
-        };
-
-        std::promise<int> p;
-
-        std::function<void()> f = [sp = capture(p)]() { sp->set_value(42); };
-    }
-} // namespace ex41
-
 namespace ex42
 {
-    // templated_for_each is a template and must be visible at the
-    // point where it is called.
+    // std::function is as a vocabulary type for passing "behaviors" even across module boundaries.
+
+    // templated_for_each is a template and must be visible at the point where it is called.
+    // So can't be used across module boundaries.
     template <class F>
     void
     templated_for_each(std::vector<int> &v, F f)
@@ -1282,6 +1290,34 @@ namespace ex42
     // It can be called with only its declaration in scope.
     extern void type_erased_for_each(std::vector<int> &, std::function<void(int)>);
 } // namespace ex42
+
+// std::function, copyability, and allocation
+
+// Just like std::any, std::function requires that whatever object you store in it must be
+// copy-constructible. This can present a problem if you are using a lot of lambdas that capture
+// std::future<T>, std::unique_ptr<T>, or other move-only types: such lambda types
+// will be move-only themselves. One way to fix that was demonstrated in the std::any and
+// copyability section in this chapter: we could introduce a shim that is syntactically copyable
+// but throws an exception if you try to copy it.
+
+namespace ex41
+{
+    void
+    test()
+    {
+        // When working with std::function and lambda captures, it might often be preferable to
+        // capture your move-only lambda captures by shared_ptr.
+        auto capture = [](auto &promise) {
+            using T = std::decay_t<decltype(promise)>;
+            return std::make_shared<T>(std::move(promise));
+        };
+
+        std::promise<int> p;
+
+        // set value of shared promise
+        std::function<void()> f = [shared_promise_ptr = capture(p)]() { shared_promise_ptr->set_value(42); };
+    }
+} // namespace ex41
 
 int
 main()

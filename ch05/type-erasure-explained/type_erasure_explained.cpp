@@ -14,6 +14,7 @@ class SeeAndSay
         virtual const char *say() const = 0;
     };
 
+    // model (implementation)
     template <typename T>
     class AnimalModel : public AnimalConcept
     {
