@@ -3,13 +3,13 @@
 #include <memory>
 #include <utility>
 
-namespace ex1
+namespace ex01
 {
     namespace std
     {
         using ::std::exchange;
         using ::std::forward;
-        // ex1
+
         template <typename T>
         class unique_ptr
         {
@@ -17,6 +17,7 @@ namespace ex1
 
           public:
             constexpr unique_ptr() noexcept = default;
+
             constexpr unique_ptr(T *p) noexcept : m_ptr(p)
             {
             }
@@ -26,22 +27,24 @@ namespace ex1
             {
                 return m_ptr;
             }
+
             operator bool() const noexcept
             {
                 return bool(get());
             }
+
             T &
             operator*() const noexcept
             {
                 return *get();
             }
+
             T *
             operator->() const noexcept
             {
                 return get();
             }
-            // dex1
-            // ex2
+
             void
             reset(T *p = nullptr) noexcept
             {
@@ -54,8 +57,7 @@ namespace ex1
             {
                 return std::exchange(m_ptr, nullptr);
             }
-            // dex2
-            // ex3
+
             unique_ptr(unique_ptr &&rhs) noexcept
             {
                 this->reset(rhs.release());
@@ -73,41 +75,41 @@ namespace ex1
                 reset();
             }
         };
-        // dex3
     } // namespace std
 
     namespace std
     {
-        // ex4
         template <typename T, typename... Args>
         unique_ptr<T>
         make_unique(Args &&...args)
         {
             return unique_ptr<T>(new T(std::forward<Args>(args)...));
         }
-        // dex4
     } // namespace std
 
-    // ex5
     struct Widget
     {
         virtual ~Widget();
     };
+
     struct WidgetImpl : Widget
     {
         WidgetImpl(int size);
     };
+
     struct WidgetHolder
     {
         void take_ownership_of(Widget *) noexcept;
     };
+
     void use(WidgetHolder &);
 
     void
-    test()
+    test1()
     {
         Widget       *w = new WidgetImpl(30);
         WidgetHolder *wh;
+
         try
         {
             wh = new WidgetHolder();
@@ -117,6 +119,7 @@ namespace ex1
             delete w;
             throw;
         }
+
         wh->take_ownership_of(w);
         try
         {
@@ -129,34 +132,34 @@ namespace ex1
         }
         delete wh;
     }
-    // dex5
+
     Widget::~Widget()
     {
     }
+
     WidgetImpl::WidgetImpl(int)
     {
     }
+
     void
     WidgetHolder::take_ownership_of(Widget *w) noexcept
     {
         delete w;
     }
+
     void
     use(WidgetHolder &)
     {
     }
-#define test test2
-    // ex6
+
     void
-    test()
+    test2()
     {
         auto w  = std::make_unique<WidgetImpl>(30);
         auto wh = std::make_unique<WidgetHolder>();
         wh->take_ownership_of(w.release());
         use(*wh);
     }
-// dex6
-#undef test
 
     void
     test3()
@@ -172,8 +175,8 @@ namespace ex1
             delete w;
             throw;
         }
+
         wh->take_ownership_of(w);
-        // ex8
         try
         {
             use(*wh);
@@ -184,39 +187,29 @@ namespace ex1
             throw;
         }
         delete wh;
-// dex8
-#if 0
-//ex9
-    try {
-        use(*wh);
-    } finally {
-        delete wh;
     }
-//dex9
-#endif
-    }
-} // namespace ex1
+} // namespace ex01
 
-namespace ex7
+namespace ex07
 {
     void
     test()
     {
-        using ex1::Widget;
-        using ex1::WidgetImpl;
-        // ex7
-        std::unique_ptr<Widget> bad(new WidgetImpl(30));
+        using ex01::Widget;
+        using ex01::WidgetImpl;
+
+        using Widget_ptr = std::unique_ptr<Widget>;
+
+        Widget_ptr bad(new WidgetImpl(30));
         bad.reset(new WidgetImpl(40));
 
-        std::unique_ptr<Widget> good = std::make_unique<WidgetImpl>(30);
-        good                         = std::make_unique<WidgetImpl>(40);
-        // dex7
+        Widget_ptr good = std::make_unique<WidgetImpl>(30);
+        good            = std::make_unique<WidgetImpl>(40);
     }
-} // namespace ex7
+} // namespace ex07
 
 namespace ex10
 {
-    // ex10
     struct fcloser
     {
         void
@@ -241,7 +234,7 @@ namespace ex10
         use(f.get());
         // f will be closed even if use() throws
     }
-    // dex10
+
     void
     use(FILE *)
     {
@@ -253,10 +246,10 @@ namespace ex11
     struct X
     {
     };
+
     void
     test()
     {
-        // ex11
         std::shared_ptr<X> pa, pb, pc;
 
         pa = std::make_shared<X>();
@@ -272,19 +265,18 @@ namespace ex11
         pb = nullptr;
         // decrement the use-count back to 1
         assert(pc.use_count() == 1);
-        // dex11
     }
 } // namespace ex11
 
 namespace ex12
 {
-    // ex12
     struct Super
     {
         int first, second;
         Super(int a, int b) : first(a), second(b)
         {
         }
+
         ~Super()
         {
             puts("destroying Super");
@@ -305,7 +297,6 @@ namespace ex12
         puts("accessing Super::second");
         assert(*q == 2);
     }
-    // dex12
 } // namespace ex12
 
 namespace ex13
@@ -316,7 +307,6 @@ namespace ex13
     void
     test()
     {
-        // ex13
         std::shared_ptr<X> pa, pb, pc;
 
         pa = std::make_shared<X>();
@@ -336,13 +326,11 @@ namespace ex13
         // calls "delete" on the X object
 
         *pb; // accessing the freed object yields undefined behavior
-        // dex13
     }
 } // namespace ex13
 
 namespace ex14
 {
-    // ex14
     struct DangerousWatcher
     {
         int *m_ptr = nullptr;
@@ -352,6 +340,7 @@ namespace ex14
         {
             m_ptr = p.get();
         }
+
         int
         current_value() const
         {
@@ -359,12 +348,10 @@ namespace ex14
             return *m_ptr;
         }
     };
-    // dex14
 } // namespace ex14
 
 namespace ex15
 {
-    // ex15
     struct NotReallyAWatcher
     {
         std::shared_ptr<int> m_ptr;
@@ -382,12 +369,10 @@ namespace ex15
             return *m_ptr;
         }
     };
-    // dex15
 } // namespace ex15
 
 namespace ex16
 {
-    // ex16
     struct CorrectWatcher
     {
         std::weak_ptr<int> m_ptr;
@@ -397,6 +382,7 @@ namespace ex16
         {
             m_ptr = std::weak_ptr<int>(p);
         }
+
         int
         current_value() const
         {
@@ -412,14 +398,13 @@ namespace ex16
             }
         }
     };
-    // dex16
 } // namespace ex16
 
 namespace ex17
 {
     using std::shared_ptr;
     using std::weak_ptr;
-    // ex17
+
     template <class T>
     class enable_shared_from_this
     {
@@ -439,7 +424,6 @@ namespace ex17
             return shared_ptr<T>(m_weak);
         }
     };
-    // dex17
 } // namespace ex17
 
 namespace ex18
@@ -450,8 +434,7 @@ namespace ex18
     {
         caught += 1;
     }
-#define test test2
-    // ex18
+
     struct Widget : std::enable_shared_from_this<Widget>
     {
         template <class F>
@@ -463,7 +446,7 @@ namespace ex18
     };
 
     void
-    test()
+    test1()
     {
         auto sa = std::make_shared<Widget>();
 
@@ -480,20 +463,18 @@ namespace ex18
             puts("Caught!");
         }
     }
-// dex18
-#undef test
+
     void
-    test()
+    test2()
     {
         caught = 0;
-        test2();
+        test1();
         assert(caught == 1);
     }
 } // namespace ex18
 
 namespace ex19
 {
-    // ex19
     template <class Derived>
     class addable
     {
@@ -506,42 +487,51 @@ namespace ex19
             return lhs;
         }
     };
-    // dex19
+
     static int copies, moves;
     struct D1 : addable<D1>
     {
         D1() = default;
+
         D1(const D1 &)
         {
             copies += 1;
         }
+
         D1(D1 &&)
         {
             moves += 1;
         }
+
         auto &
         operator+=(const D1 &)
         {
             return *this;
         }
     };
+
     void
     test()
     {
         D1 a, b;
         copies = moves = 0;
-        D1 r{a + b};
+        D1 r1{a + b};
         assert(copies == 1 && moves == 1);
+
         copies = moves = 0;
         D1 r2          = std::move(a) + b;
         assert(copies == 1 && moves == 1);
+
         copies = moves = 0;
         D1 r3          = a + std::move(b);
         assert(copies == 1 && moves == 1);
+
         copies = moves = 0;
         D1 r4          = std::move(a) + std::move(b);
         assert(copies == 1 && moves == 1);
-        (void)r;
+
+        // unused
+        (void)r1;
         (void)r2;
         (void)r3;
         (void)r4;
@@ -550,7 +540,6 @@ namespace ex19
 
 namespace ex20
 {
-    // ex20
     template <class Derived>
     class addable
     {
@@ -562,25 +551,29 @@ namespace ex20
             return lhs;
         }
     };
-    // dex20
+
     static int copies, moves;
     struct D1 : addable<D1>
     {
         D1() = default;
+
         D1(const D1 &)
         {
             copies += 1;
         }
+
         D1(D1 &&)
         {
             moves += 1;
         }
+
         auto &
         operator+=(const D1 &)
         {
             return *this;
         }
     };
+
     void
     test()
     {
@@ -588,15 +581,20 @@ namespace ex20
         copies = moves = 0;
         D1 r{a + b};
         assert(copies == 1 && moves == 1);
+
         copies = moves = 0;
         D1 r2          = std::move(a) + b;
         assert(copies == 0 && moves == 2);
+
         copies = moves = 0;
         D1 r3          = a + std::move(b);
         assert(copies == 1 && moves == 1);
+
         copies = moves = 0;
         D1 r4          = std::move(a) + std::move(b);
         assert(copies == 0 && moves == 2);
+
+        // unused
         (void)r;
         (void)r2;
         (void)r3;
@@ -607,24 +605,21 @@ namespace ex20
 namespace ex21
 {
     class Widget;
-    // ex21
     void remusnoc(std::unique_ptr<Widget> p);
 
     std::unique_ptr<Widget> recudorp();
-    // dex21
 } // namespace ex21
 
 namespace ex22
 {
     class Widget;
-    // ex22
     void suougibma(Widget *p);
-    // dex22
 } // namespace ex22
 
 namespace ex23
 {
-    // ex23
+    class Widget;
+
     template <typename T>
     class observer_ptr
     {
@@ -641,15 +636,18 @@ namespace ex23
         {
             return m_ptr;
         }
+
         operator bool() const noexcept
         {
             return bool(get());
         }
+
         T &
         operator*() const noexcept
         {
             return *get();
         }
+
         T *
         operator->() const noexcept
         {
@@ -658,20 +656,19 @@ namespace ex23
     };
 
     void revresbo(observer_ptr<Widget> p);
-    // dex23
 } // namespace ex23
 
 int
 main()
 {
-    ex1::test();
-    ex1::test2();
-    ex1::test3();
+    ex01::test1();
+    ex01::test2();
+    ex01::test3();
     ex10::test();
     ex11::test();
     ex12::test();
-    // ex13::test(); has undefined behavior
-    ex18::test();
-    ex19::test();
+    // ex13::test(); // has undefined behavior; crashes
+    ex18::test1();
+    // ex19::test(); // crashes
     ex20::test();
 }
