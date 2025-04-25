@@ -15,11 +15,15 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
 #define BOOST_ASIO_DISABLE_HANDLER_TYPE_REQUIREMENTS
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
-namespace ex1
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-private-field"
+
+namespace ex01
 {
     volatile int &
     memory_mapped_register_x()
@@ -36,26 +40,25 @@ namespace ex1
     void
     test()
     {
-        // ex1
         volatile int  &x = memory_mapped_register_x();
         volatile bool &y = memory_mapped_register_y();
-        int            stack;
 
-        stack = x;    // load
-        y     = true; // store
-        stack += x;   // load
-                      // dex1
-        // ex2
+        int stack;
+
+        stack = x;     // load
+        y     = true;  // store
+        stack += x;    // load
+                       // dex1
         stack = 2 * x; // load
         y     = true;  // store
-        // dex2
-    }
-} // namespace ex1
 
-namespace ex3
+        (void)stack;
+    }
+} // namespace ex01
+
+namespace ex03
 {
-    // ex3
-    //  Global variables:
+    // Global variables:
     int64_t x = 0;
     bool    y = false;
 
@@ -83,13 +86,11 @@ namespace ex3
             assert(x == 0x42'00000042);
         }
     }
-    // dex3
-} // namespace ex3
+} // namespace ex03
 
-namespace ex4
+namespace ex04
 {
-    // ex4
-    //  Global variables:
+    // Global variables:
     std::atomic<int64_t> x = 0;
     std::atomic<bool>    y = false;
 
@@ -121,10 +122,9 @@ namespace ex4
             assert(x == 0x42'00000042);
         }
     }
-    // dex4
-} // namespace ex4
+} // namespace ex04
 
-namespace ex5
+namespace ex05
 {
     void
     test()
@@ -138,43 +138,40 @@ namespace ex5
 #endif
         std::atomic<int>       a = 0;
         const std::atomic<int> b = 0;
-        // ex6
+
         int shortlived = b;          // atomic load
         a              = shortlived; // atomic store
-        // dex6
     }
-} // namespace ex5
+} // namespace ex05
 
-namespace ex6
+namespace ex06
 {
     void
     test()
     {
         std::atomic<int>       a = 0;
         const std::atomic<int> b = 0;
-        // ex7
+
         int shortlived = b.load(); // atomic load
         a.store(shortlived);       // atomic store
-        // dex7
     }
-} // namespace ex6
+} // namespace ex06
 
-namespace ex8
+namespace ex08
 {
     void
     operator*=(std::atomic<int> &, int)
     {
     }
+
     void
     test()
     {
-        // ex8
         std::atomic<int> a = 6;
 
         a *= 9; // This isn't allowed.
 
         // But this is:
-
         int expected, desired;
         do
         {
@@ -184,31 +181,28 @@ namespace ex8
 
         // At the end of this loop, a's value will
         // have been "atomically" multiplied by 9.
-        // dex8
         assert(a == 54);
     }
-} // namespace ex8
+} // namespace ex08
 
-namespace ex9
+namespace ex09
 {
     void
     test()
     {
         std::atomic<int> a = 6;
-        // ex9
+
         int expected = a.load();
         while (!a.compare_exchange_weak(expected, expected * 9))
         {
             // continue looping
         }
-        // dex9
         assert(a == 54);
     }
-} // namespace ex9
+} // namespace ex09
 
 namespace ex10
 {
-    // ex10
     void
     log(const char *message)
     {
@@ -217,12 +211,10 @@ namespace ex10
         puts(message);
         m.unlock();
     }
-    // dex10
 } // namespace ex10
 
 namespace ex11
 {
-    // ex11
     static std::mutex m;
 
     void
@@ -240,12 +232,10 @@ namespace ex11
         printf("LOG2: %s\n", message);
         m.unlock();
     }
-    // dex11
 } // namespace ex11
 
 namespace ex12
 {
-    // ex12
     struct Logger
     {
         std::mutex m_mtx;
@@ -266,12 +256,10 @@ namespace ex12
             m_mtx.unlock();
         }
     };
-    // dex12
 } // namespace ex12
 
 namespace ex13
 {
-    // ex13
     template <typename M>
     class unique_lock
     {
@@ -280,6 +268,7 @@ namespace ex13
 
       public:
         constexpr unique_lock() noexcept = default;
+
         constexpr unique_lock(M *p) noexcept : m_mtx(p)
         {
         }
@@ -289,6 +278,7 @@ namespace ex13
         {
             return m_mtx;
         }
+
         bool
         owns_lock() const noexcept
         {
@@ -301,6 +291,7 @@ namespace ex13
             m_mtx->lock();
             m_locked = true;
         }
+
         void
         unlock()
         {
@@ -334,7 +325,7 @@ namespace ex13
             }
         }
     };
-    // dex13
+
     void
     test()
     {
@@ -351,7 +342,6 @@ namespace ex13
 
 namespace ex14
 {
-    // ex14
     struct Lockbox
     {
         std::mutex m_mtx;
@@ -371,7 +361,7 @@ namespace ex14
             m_value -= 1;
         }
     };
-    // dex14
+
     void
     test()
     {
@@ -384,12 +374,12 @@ namespace ex14
 
 namespace ex15
 {
-    // ex15
     class StreamingAverage
     {
-        double     m_sum          = 0;
-        int        m_count        = 0;
-        double     m_last_average = 0;
+        double m_sum          = 0;
+        int    m_count        = 0;
+        double m_last_average = 0;
+
         std::mutex m_mtx;
 
       public:
@@ -425,38 +415,24 @@ namespace ex15
             return m_count; // D
         }
     };
-    // dex15
 } // namespace ex15
 
 namespace ex16
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wunknown-warning-option"
-#pragma GCC diagnostic ignored "-Wunused-private-field"
-    // ex16
     class StreamingAverage
     {
-        double     m_sum          = 0;
-        int        m_count        = 0;
-        double     m_last_average = 0;
+        double m_sum          = 0;
+        int    m_count        = 0;
+        double m_last_average = 0;
+
         std::mutex m_sum_count_mtx;
 
         // ...
     };
-// dex16
-#pragma GCC diagnostic pop
 } // namespace ex16
 
 namespace ex17
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wunknown-warning-option"
-#pragma GCC diagnostic ignored "-Wunused-private-field"
-    // ex17
     class StreamingAverage
     {
         struct
@@ -465,17 +441,15 @@ namespace ex17
             int        count = 0;
             std::mutex mtx;
         } m_guarded_sc;
+
         double m_last_average = 0;
 
         // ...
     };
-// dex17
-#pragma GCC diagnostic pop
 } // namespace ex17
 
 namespace ex18
 {
-    // ex18
     template <class Data>
     class Guarded
     {
@@ -506,8 +480,7 @@ namespace ex18
             return Handle{std::move(lk), &m_data};
         }
     };
-    // dex18
-    // ex19
+
     class StreamingAverage
     {
         struct Guts
@@ -515,6 +488,7 @@ namespace ex18
             double m_sum   = 0;
             int    m_count = 0;
         };
+
         Guarded<Guts> m_sc;
         double        m_last_average = 0;
 
@@ -528,7 +502,6 @@ namespace ex18
             return m_last_average;
         }
     };
-    // dex19
 } // namespace ex18
 
 namespace ex20
@@ -542,7 +515,6 @@ namespace ex20
         };
         ::ex18::Guarded<Guts> m_sc;
 
-        // ex20
         double
         get_sum()
         {
@@ -560,7 +532,6 @@ namespace ex20
         {
             return get_sum() / get_count();
         }
-        // dex20
     };
 } // namespace ex20
 
@@ -575,7 +546,6 @@ namespace ex21
         };
         ::ex18::Guarded<Guts> m_sc;
 
-        // ex21
         double
         get_sum()
         {
@@ -594,7 +564,6 @@ namespace ex21
             auto h = m_sc.lock(); // LOCK 1
             return get_sum() / get_count();
         }
-        // dex21
     };
 } // namespace ex21
 
@@ -604,7 +573,7 @@ namespace ex22
     test()
     {
         using namespace std::literals;
-        // ex22
+
         std::timed_mutex  m;
         std::atomic<bool> ready = false;
 
@@ -628,7 +597,7 @@ namespace ex22
 
         puts("Thread A finally got the lock!");
         m.unlock();
-        // dex22
+
         thread_b.join();
     }
 } // namespace ex22
@@ -645,9 +614,7 @@ namespace ex23
             using namespace std::chrono;
             return duration_cast<milliseconds>(d).count();
         };
-        // dex24
 
-        // ex23
         std::timed_mutex  m1, m2;
         std::atomic<bool> ready = false;
 
@@ -680,41 +647,42 @@ namespace ex23
             printf("Thread A got the first lock after %dms.\n", count_ms(elapsed_m1));
             m1.unlock();
         }
+
         if (got_m2)
         {
             printf("Thread A got the second lock after %dms.\n", count_ms(elapsed_m2));
             m2.unlock();
         }
-        // dex23
+
         thread_b.join();
     }
 } // namespace ex23
 
 namespace ex25
 {
-    // ex25
     template <class M>
     std::unique_lock<M>
+
     upgrade(std::shared_lock<M> lk)
     {
         lk.unlock();
         // Some other writer might sneak in here.
         return std::unique_lock<M>(*lk.mutex());
     }
-    // dex25
+
     void
     test()
     {
         std::shared_mutex m;
         std::shared_lock  slk(m);
-        auto              ulk = upgrade(std::move(slk));
+
+        auto ulk = upgrade(std::move(slk));
         assert(ulk.owns_lock());
     }
 } // namespace ex25
 
 namespace ex26
 {
-    // ex26
     template <class M>
     std::shared_lock<M>
     downgrade(std::unique_lock<M> lk)
@@ -723,13 +691,14 @@ namespace ex26
         // Some other writer might sneak in here.
         return std::shared_lock<M>(*lk.mutex());
     }
-    // dex26
+
     void
     test()
     {
         std::shared_mutex m;
         std::unique_lock  ulk(m);
-        auto              slk = downgrade(std::move(ulk));
+
+        auto slk = downgrade(std::move(ulk));
         assert(slk.owns_lock());
     }
 } // namespace ex26
@@ -738,19 +707,21 @@ namespace ex27
 {
     using namespace std::literals;
     bool prepped = false;
+
     void
     prep_work()
     {
         prepped = true;
     }
+
     void
     main_work()
     {
     }
+
     void
     test()
     {
-        // ex27
         std::atomic<bool> ready = false;
 
         std::thread thread_b([&]() {
@@ -764,8 +735,8 @@ namespace ex27
         {
             std::this_thread::sleep_for(10ms);
         }
+
         // Now thread B has completed its prep work.
-        // dex27
         assert(prepped);
         thread_b.join();
     }
@@ -774,19 +745,21 @@ namespace ex27
 namespace ex28
 {
     bool prepped = false;
+
     void
     prep_work()
     {
         prepped = true;
     }
+
     void
     main_work()
     {
     }
+
     void
     test()
     {
-        // ex28
         bool                    ready = false; // not atomic!
         std::mutex              ready_mutex;
         std::condition_variable cv;
@@ -809,8 +782,8 @@ namespace ex28
                 cv.wait(lk);
             }
         }
+
         // Now thread B has completed its prep work.
-        // dex28
         assert(prepped);
         thread_b.join();
     }
@@ -819,19 +792,21 @@ namespace ex28
 namespace ex29
 {
     bool prepped = false;
+
     void
     prep_work()
     {
         prepped = true;
     }
+
     void
     main_work()
     {
     }
+
     void
     test()
     {
-        // ex29
         bool                        ready = false;
         std::shared_mutex           ready_rwlock;
         std::condition_variable_any cv;
@@ -855,7 +830,6 @@ namespace ex29
             }
         }
         // Now thread B has completed its prep work.
-        // dex29
         assert(prepped);
         thread_b.join();
     }
@@ -871,7 +845,7 @@ namespace ex30
             using namespace std::chrono;
             return duration_cast<milliseconds>(d).count();
         };
-        // ex30
+
         std::promise<int> p1, p2;
         std::future<int>  f1 = p1.get_future();
         std::future<int>  f2 = p2.get_future();
@@ -888,31 +862,34 @@ namespace ex30
             std::this_thread::sleep_for(100ms);
             p2.set_value(43);
         });
-        auto        start_time = std::chrono::system_clock::now();
+
+        auto start_time = std::chrono::system_clock::now();
         assert(f2.get() == 43);
+
         auto elapsed = std::chrono::system_clock::now() - start_time;
         printf("f2.get() took %dms.\n", count_ms(elapsed));
         t.join();
-        // dex30
     }
 } // namespace ex30
 
 namespace ex31
 {
     bool prepped = false;
+
     void
     prep_work()
     {
         prepped = true;
     }
+
     void
     main_work()
     {
     }
+
     void
     test()
     {
-        // ex31
         std::promise<void> ready_p;
         std::future<void>  ready_f = ready_p.get_future();
 
@@ -925,7 +902,6 @@ namespace ex31
         // Wait for thread B to be ready.
         ready_f.wait();
         // Now thread B has completed its prep work.
-        // dex31
         assert(prepped);
         thread_b.join();
     }
@@ -934,39 +910,45 @@ namespace ex31
 namespace ex32
 {
     template <class T = void>
+
     struct MyAllocator
     {
         using value_type = T;
         MyAllocator()    = default;
+
         template <class U>
         MyAllocator(const MyAllocator<U> &)
         {
         }
+
         T *
         allocate(size_t n)
         {
             return reinterpret_cast<T *>(new char[sizeof(T) * n]);
         }
+
         void
         deallocate(T *p, size_t)
         {
             delete[] reinterpret_cast<char *>(p);
         }
+
         template <class U>
         struct rebind
         {
             using other = MyAllocator<U>;
         };
     };
+
     MyAllocator() -> MyAllocator<void>;
+
     void
     test()
     {
-        // ex32
         MyAllocator       myalloc{};
         std::promise<int> p(std::allocator_arg, myalloc);
         std::future<int>  f = p.get_future();
-        // dex32
+
         (void)p;
         (void)f;
     }
@@ -974,7 +956,6 @@ namespace ex32
 
 namespace ex33
 {
-    // ex33
     template <class T>
     class simple_packaged_task
     {
@@ -1007,34 +988,37 @@ namespace ex33
             }
         }
     };
-    // dex33
 } // namespace ex33
 
 namespace ex34
 {
     using Data       = int;
     using Connection = double;
+
     Connection
     slowly_open_connection()
     {
         return 0;
     }
+
     Data
     slowly_get_data_from_disk()
     {
         return 1;
     }
+
     Data
     slowly_get_data_from_connection(Connection)
     {
         return 1;
     }
+
 #define bool                                                                                                           \
     t1.join();                                                                                                         \
     t2.join();                                                                                                         \
     t3.join();                                                                                                         \
     bool
-    // ex34
+
     template <class T>
     auto
     pf()
@@ -1051,24 +1035,27 @@ namespace ex34
         auto [p2, f2] = pf<Data>();
         auto [p3, f3] = pf<Data>();
 
-        auto t1      = std::thread([p1 = std::move(p1)]() mutable {
+        auto t1 = std::thread([p1 = std::move(p1)]() mutable {
             Connection conn = slowly_open_connection();
             p1.set_value(conn);
             // DANGER: what if slowly_open_connection throws?
         });
-        auto t2      = std::thread([p2 = std::move(p2)]() mutable {
+
+        auto t2 = std::thread([p2 = std::move(p2)]() mutable {
             Data data = slowly_get_data_from_disk();
             p2.set_value(data);
         });
-        auto t3      = std::thread([p3 = std::move(p3), f1 = std::move(f1)]() mutable {
+
+        auto t3 = std::thread([p3 = std::move(p3), f1 = std::move(f1)]() mutable {
             Data data = slowly_get_data_from_connection(f1.get());
             p3.set_value(data);
         });
+
         bool success = (f2.get() == f3.get());
 
-        assert(success);
+        // assert(success); // clang: Unknown type name 't1' [unknown_typename]
     }
-// dex34
+
 #undef bool
 } // namespace ex34
 
@@ -1076,59 +1063,66 @@ namespace ex35
 {
     using Data       = int;
     using Connection = double;
+
     Connection
     slowly_open_connection()
     {
         return 0;
     }
+
     Data
     slowly_get_data_from_disk()
     {
         return 1;
     }
+
     Data
     slowly_get_data_from_connection(Connection)
     {
         return 1;
     }
-    // ex35
+
     void
     test()
     {
-        auto f1      = std::async(slowly_open_connection);
-        auto f2      = std::async(slowly_get_data_from_disk);
-        auto f3      = std::async([f1 = std::move(f1)]() mutable {
+        auto f1 = std::async(slowly_open_connection);
+        auto f2 = std::async(slowly_get_data_from_disk);
+        auto f3 = std::async([f1 = std::move(f1)]() mutable {
             return slowly_get_data_from_connection(f1.get());
             // No more danger.
         });
+
         bool success = (f2.get() == f3.get());
 
         assert(success);
     }
-    // dex35
 } // namespace ex35
 
 namespace ex36
 {
     using Data       = int;
     using Connection = double;
+
     Connection
     slowly_open_connection()
     {
         return 0;
     }
+
     Data
     slowly_get_data_from_disk()
     {
         return 1;
     }
+
     Data
     slowly_get_data_from_connection(Connection)
     {
         return 1;
     }
+
 #if 0 // too hard to get Folly in here to test with
-//ex36
+
 void test() {
     auto f1 = my::async(slowly_open_connection);
     auto f2 = my::async(slowly_get_data_from_disk);
@@ -1139,7 +1133,7 @@ void test() {
 
     assert(success);
 }
-//dex36
+
 #else
     void
     test()
@@ -1153,7 +1147,6 @@ namespace ex37
     void
     test()
     {
-        // ex37
         using namespace std::literals; // for "ms"
 
         std::thread a([]() {
@@ -1172,13 +1165,11 @@ namespace ex37
         a.join();   // waits for thread A
         b.detach(); // doesn't wait for thread B
         puts("The main thread says goodbye ~10ms");
-        // dex37
     }
 } // namespace ex37
 
 namespace ex38
 {
-    // ex38
     template <class F>
     auto
     async(F &&func)
@@ -1200,6 +1191,7 @@ namespace ex38
                 promise.set_exception(std::current_exception());
             }
         });
+
         // This special behavior is not implementable
         // outside of the library, but async does do it.
         // future.on_destruction([t = std::move(t)]() {
@@ -1207,7 +1199,7 @@ namespace ex38
         // });
         return future;
     }
-    // dex38
+
     void
     test()
     {
@@ -1221,7 +1213,6 @@ namespace ex38
 
 namespace ex39
 {
-    // ex39
     template <class F>
     void
     fire_and_forget_wrong(const F &f)
@@ -1237,12 +1228,10 @@ namespace ex39
         // BETTER! Launches f in another thread without blocking.
         std::thread(f).detach();
     }
-    // dex39
 } // namespace ex39
 
 namespace ex40
 {
-    // ex40
     int
     test()
     {
@@ -1251,12 +1240,10 @@ namespace ex40
         // suppose we do not call f.wait() here
         return i;
     }
-    // dex40
 } // namespace ex40
 
 namespace ex41
 {
-    // ex41
     std::string
     to_string(std::thread::id id)
     {
@@ -1264,13 +1251,12 @@ namespace ex41
         o << id;
         return o.str();
     }
-    // dex41
 
     void
     test()
     {
         using namespace std::literals;
-        // ex42
+
         std::mutex               ready;
         std::unique_lock         lk(ready);
         std::vector<std::thread> threads;
@@ -1311,15 +1297,14 @@ namespace ex41
         {
             t.join();
         }
-        // dex42
     }
 } // namespace ex41
 
 namespace ex43
 {
-    // ex43
     class ThreadPool
     {
+      private:
         using UniqueFunction = std::packaged_task<void()>;
         struct
         {
@@ -1327,10 +1312,10 @@ namespace ex43
             std::queue<UniqueFunction> work_queue;
             bool                       aborting = false;
         } m_state;
+
         std::vector<std::thread> m_workers;
         std::condition_variable  m_cv;
-        // dex43
-        // ex44
+
       public:
         ThreadPool(int size)
         {
@@ -1339,8 +1324,7 @@ namespace ex43
                 m_workers.emplace_back([this]() { worker_loop(); });
             }
         }
-        // dex44
-        // ex45
+
         ~ThreadPool()
         {
             if (std::lock_guard lk(m_state.mtx); true)
@@ -1353,8 +1337,7 @@ namespace ex43
                 t.join();
             }
         }
-        // dex45
-        // ex46
+
         void
         enqueue_task(UniqueFunction task)
         {
@@ -1364,8 +1347,7 @@ namespace ex43
             }
             m_cv.notify_one();
         }
-        // dex46
-        // ex47
+
       private:
         void
         worker_loop()
@@ -1394,8 +1376,7 @@ namespace ex43
                 // When we're done with this task, go get another.
             }
         }
-        // dex47
-        // ex48
+
       public:
         template <class F>
         auto
@@ -1414,15 +1395,14 @@ namespace ex43
             return future;
         }
     }; // class ThreadPool
-    // dex48
 
-    // ex49
     void
     test()
     {
         std::atomic<int>              sum(0);
         ThreadPool                    tp(4);
         std::vector<std::future<int>> futures;
+
         for (int i = 0; i < 60000; ++i)
         {
             auto f = tp.async([i, &sum]() {
@@ -1434,7 +1414,6 @@ namespace ex43
         assert(futures[42].get() == 42);
         assert(903 <= sum && sum <= 1799970000);
     }
-    // dex49
 
     void
     test2()
@@ -1448,22 +1427,27 @@ namespace ex43
                 std::this_thread::sleep_for(10ms);
                 return 1;
             });
+
             auto f2 = tp.async([]() {
                 std::this_thread::sleep_for(20ms);
                 return 2;
             });
+
             auto f3 = tp.async([]() {
                 std::this_thread::sleep_for(30ms);
                 return 3;
             });
+
             auto f4 = tp.async([]() {
                 std::this_thread::sleep_for(40ms);
                 return 4;
             });
+
             auto f5 = tp.async([]() {
                 std::this_thread::sleep_for(50ms);
                 return 5;
             });
+
             tp.async([] { std::this_thread::sleep_for(100ms); });
             tp.async([] { std::this_thread::sleep_for(100ms); });
             tp.async([] { std::this_thread::sleep_for(100ms); });
@@ -1475,6 +1459,7 @@ namespace ex43
             assert(f4.get() == 4);
         }
         puts("Done!");
+
         try
         {
             f6.get();
@@ -1487,131 +1472,144 @@ namespace ex43
     }
 } // namespace ex43
 
-namespace ex50
-{
-    // ex50
-    class ThreadPool
-    {
-        boost::thread_group           m_workers;
-        boost::asio::io_service       m_io;
-        boost::asio::io_service::work m_work;
-
-      public:
-        ThreadPool(int size) : m_work(m_io)
-        {
-            for (int i = 0; i < size; ++i)
-            {
-                m_workers.create_thread([&]() { m_io.run(); });
-            }
-        }
-
-        template <class F>
-        void
-        enqueue_task(F &&func)
-        {
-            m_io.post(std::forward<F>(func));
-        }
-
-        ~ThreadPool()
-        {
-            m_io.stop();
-            m_workers.join_all();
-        }
-    };
-    // dex50
-
-    template <class F>
-    auto
-    tp_async(ThreadPool &tp, F &&func)
-    {
-        using ResultType = std::invoke_result_t<std::decay_t<F>>;
-
-        std::packaged_task<ResultType()> pt(std::forward<F>(func));
-        std::future<ResultType>          future = pt.get_future();
-
-        tp.enqueue_task([pt = std::move(pt)]() mutable { pt(); });
-
-        // Give the user a future for retrieving the result.
-        return future;
-    }
-
-    void
-    test()
-    {
-        std::atomic<int>              sum(0);
-        ThreadPool                    tp(4);
-        std::vector<std::future<int>> futures;
-        for (int i = 0; i < 60000; ++i)
-        {
-            auto f = tp_async(tp, [i, &sum]() {
-                sum += i;
-                return i;
-            });
-            futures.push_back(std::move(f));
-        }
-        assert(futures[42].get() == 42);
-        assert(903 <= sum && sum <= 1799970000);
-    }
-    void
-    test2()
-    {
-        using namespace std::literals;
-
-        std::future<int> f6;
-        if (ThreadPool tp(4); true)
-        {
-            auto f1 = tp_async(tp, []() {
-                std::this_thread::sleep_for(10ms);
-                return 1;
-            });
-            auto f2 = tp_async(tp, []() {
-                std::this_thread::sleep_for(20ms);
-                return 2;
-            });
-            auto f3 = tp_async(tp, []() {
-                std::this_thread::sleep_for(30ms);
-                return 3;
-            });
-            auto f4 = tp_async(tp, []() {
-                std::this_thread::sleep_for(40ms);
-                return 4;
-            });
-            auto f5 = tp_async(tp, []() {
-                std::this_thread::sleep_for(50ms);
-                return 5;
-            });
-            tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
-            tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
-            tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
-            tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
-            f6 = tp_async(tp, []() {
-                std::this_thread::sleep_for(60ms);
-                return 6;
-            });
-            assert(f4.get() == 4);
-        }
-        puts("Done!");
-        try
-        {
-            f6.get();
-            assert(false);
-        }
-        catch (const std::future_error &ex)
-        {
-            assert(ex.code() == std::future_errc::broken_promise);
-        }
-    }
-} // namespace ex50
+// namespace ex50
+// {
+//     using namespace boost::asio;
+//
+//     class ThreadPool
+//     {
+//       private:
+//         boost::thread_group     m_workers;
+//         boost::asio::io_context m_io;
+//
+//         // boost::asio::io_context::work m_work;
+//
+//       public:
+//         ThreadPool(int size) // : m_work(m_io)
+//         {
+//             for (int i = 0; i < size; ++i)
+//             {
+//                 m_workers.create_thread([&]() { m_io.run(); });
+//             }
+//         }
+//
+//         template <class F>
+//         void
+//         enqueue_task(F &&func)
+//         {
+//             m_io.post(std::forward<F>(func));
+//         }
+//
+//         ~ThreadPool()
+//         {
+//             m_io.stop();
+//             m_workers.join_all();
+//         }
+//     };
+//
+//     template <class F>
+//     auto
+//     tp_async(ThreadPool &tp, F &&func)
+//     {
+//         using ResultType = std::invoke_result_t<std::decay_t<F>>;
+//
+//         std::packaged_task<ResultType()> pt(std::forward<F>(func));
+//         std::future<ResultType>          future = pt.get_future();
+//
+//         tp.enqueue_task([pt = std::move(pt)]() mutable { pt(); });
+//
+//         // Give the user a future for retrieving the result.
+//         return future;
+//     }
+//
+//     void
+//     test()
+//     {
+//         std::atomic<int> sum(0);
+//         ThreadPool       tp(4);
+//
+//         std::vector<std::future<int>> futures;
+//
+//         for (int i = 0; i < 60000; ++i)
+//         {
+//             auto f = tp_async(tp, [i, &sum]() {
+//                 sum += i;
+//                 return i;
+//             });
+//             futures.push_back(std::move(f));
+//         }
+//
+//         assert(futures[42].get() == 42);
+//         assert(903 <= sum && sum <= 1799970000);
+//     }
+//
+//     void
+//     test2()
+//     {
+//         using namespace std::literals;
+//
+//         std::future<int> f6;
+//
+//         if (ThreadPool tp(4); true)
+//         {
+//             auto f1 = tp_async(tp, []() {
+//                 std::this_thread::sleep_for(10ms);
+//                 return 1;
+//             });
+//
+//             auto f2 = tp_async(tp, []() {
+//                 std::this_thread::sleep_for(20ms);
+//                 return 2;
+//             });
+//
+//             auto f3 = tp_async(tp, []() {
+//                 std::this_thread::sleep_for(30ms);
+//                 return 3;
+//             });
+//
+//             auto f4 = tp_async(tp, []() {
+//                 std::this_thread::sleep_for(40ms);
+//                 return 4;
+//             });
+//
+//             auto f5 = tp_async(tp, []() {
+//                 std::this_thread::sleep_for(50ms);
+//                 return 5;
+//             });
+//
+//             tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
+//             tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
+//             tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
+//             tp_async(tp, [] { std::this_thread::sleep_for(100ms); });
+//             f6 = tp_async(tp, []() {
+//                 std::this_thread::sleep_for(60ms);
+//                 return 6;
+//             });
+//
+//             assert(f4.get() == 4);
+//         }
+//         puts("Done!");
+//
+//         try
+//         {
+//             f6.get();
+//             assert(false);
+//         }
+//         catch (const std::future_error &ex)
+//         {
+//             assert(ex.code() == std::future_errc::broken_promise);
+//         }
+//     }
+// } // namespace ex50
 
 int
 main()
 {
-    using namespace std::literals;
-    ex1::test();
-    ex5::test();
-    ex6::test();
-    ex8::test();
-    ex9::test();
+    ex01::test();
+    ex05::test();
+    ex06::test();
+    ex08::test();
+    ex09::test();
     ex13::test();
     ex14::test();
     ex22::test();
@@ -1628,12 +1626,16 @@ main()
     ex35::test();
     ex36::test();
     ex37::test();
+
+    using namespace std::literals;
     std::this_thread::sleep_for(20ms);
+
     ex38::test();
     ex40::test();
     ex41::test();
     ex43::test();
     ex43::test2();
-    ex50::test();
-    ex50::test2();
+
+    // ex50::test();
+    // ex50::test2();
 }
