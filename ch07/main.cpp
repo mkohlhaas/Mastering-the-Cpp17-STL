@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <functional>
 #include <future>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -23,6 +24,8 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-private-field"
 
+// The problem with volatile
+
 namespace ex01
 {
     volatile int &
@@ -31,12 +34,14 @@ namespace ex01
         static int x = 0;
         return x;
     }
+
     volatile bool &
     memory_mapped_register_y()
     {
         static bool y = 0;
         return y;
     }
+
     void
     test()
     {
@@ -45,10 +50,11 @@ namespace ex01
 
         int stack;
 
-        stack = x;     // load
-        y     = true;  // store
-        stack += x;    // load
-                       // dex1
+        stack = x;    // load
+        y     = true; // store
+        stack += x;   // load
+
+        // would be the same without volatile - but with volatile compiler can't optimize
         stack = 2 * x; // load
         y     = true;  // store
 
@@ -56,8 +62,13 @@ namespace ex01
     }
 } // namespace ex01
 
+// volatile is obsolete
+
 namespace ex03
 {
+    // volatile accesses are not guaranteed to be atomic
+    // volatile accesses are not guaranteed to be sequentially consistent
+
     // Global variables:
     int64_t x = 0;
     bool    y = false;
@@ -88,9 +99,15 @@ namespace ex03
     }
 } // namespace ex03
 
+// Using std::atomic<T> for thread-safe accesses
+
 namespace ex04
 {
     // Global variables:
+    // Think of std::atomic as a magical built-in family of types whose names just happen to contain angle brackets!
+    //
+    // This way of thinking about it is actually pretty useful, because it suggests - correctly - that std::atomic
+    // is partly built into the compiler, and so the compiler will usually generate optimal code for atomic operations.
     std::atomic<int64_t> x = 0;
     std::atomic<bool>    y = false;
 
@@ -129,13 +146,18 @@ namespace ex05
     void
     test()
     {
-#if 0
-//ex5
-    std::atomic<int> a, b;
 
-    a = b;  // DOES NOT COMPILE!
-//dex5
+#if 0
+        // There is a difference between objects of type std::atomic<T>
+        // (which conceptually live "out there" in memory) and short-lived values of type T (which
+        // conceptually live "right here," close at hand; for example, in CPU registers)
+    
+        std::atomic<int> a, b;
+        a = b; // DOES NOT COMPILE! There is no copy-assignment operator for std::atomic<int>.
 #endif
+        // Memory-to-memory in an atomic operation isnt't supported by most hardware platforms
+
+        // You have to explicitly say what you mean!
         std::atomic<int>       a = 0;
         const std::atomic<int> b = 0;
 
@@ -152,10 +174,16 @@ namespace ex06
         std::atomic<int>       a = 0;
         const std::atomic<int> b = 0;
 
+        // use of load() and store() is optional
         int shortlived = b.load(); // atomic load
         a.store(shortlived);       // atomic store
+
+        // the same:
+        a.store(b.load()); // But not recommended! Stick to a single atomic operation per source line!
     }
 } // namespace ex06
+
+// Doing complicated operations atomically
 
 namespace ex08
 {
@@ -169,15 +197,23 @@ namespace ex08
     {
         std::atomic<int> a = 6;
 
-        a *= 9; // This isn't allowed.
+        a *= 9; // This isn't allowed!
+        assert(a == 6);
 
         // But this is:
         int expected, desired;
         do
         {
+            std::cout << "compare and swap" << '\n';
             expected = a.load();
             desired  = expected * 9;
-        } while (!a.compare_exchange_weak(expected, desired));
+        } while (!a.compare_exchange_weak(expected, desired)); // atomic operation "compare and swap"
+        // IF a HAS THE expected VALUE, GIVE IT THE desired VALUE!
+
+        // The meaning of a.compare_exchange_weak(expected, desired) is that the processor
+        // should look at a; and if its value is currently expected, then set its value to desired;
+        // otherwise don't. The function call returns true if a was set to desired and false
+        // otherwise.
 
         // At the end of this loop, a's value will
         // have been "atomically" multiplied by 9.
@@ -192,24 +228,38 @@ namespace ex09
     {
         std::atomic<int> a = 6;
 
+        // loading expected only once
         int expected = a.load();
         while (!a.compare_exchange_weak(expected, expected * 9))
         {
-            // continue looping
+            // ... continue looping ...
         }
         assert(a == 54);
+
+        // The dirty little secret of std::atomic is that most of the compound assignment operations
+        // are implemented as compare-exchange loops just like this.
     }
 } // namespace ex09
+
+// Taking turns with std::mutex
 
 namespace ex10
 {
     void
     log(const char *message)
     {
+        // If there is just one critical section that needs protection,
+        // you can put the mutex in a function-scoped static variable.
+        //
+        // The static keyword here is very important! If we had omitted it, then m would have been
+        // a plain old stack variable, and each thread that entered log would have received its own
+        // distinct copy of m.
         static std::mutex m;
-        m.lock(); // avoid interleaving messages on stdout
-        puts(message);
-        m.unlock();
+        {                  // braces not needed; just added to make critical section obvious
+            m.lock();
+            puts(message); // avoid interleaving messages on stdout
+            m.unlock();
+        }
     }
 } // namespace ex10
 
@@ -236,6 +286,13 @@ namespace ex11
 
 namespace ex12
 {
+    // Try to eliminate the global mutex variable by creating a class type
+    // and making the mutex object a member variable of that class.
+
+    // Now messages printed by one Logger may interleave with messages printed by another
+    // Logger, but concurrent accesses to the same Logger object will take locks on the same
+    // m_mtx, which means they will block each other and nicely take turns entering the critical
+    // functions log1 and log2, one at a time.
     struct Logger
     {
         std::mutex m_mtx;
@@ -258,22 +315,30 @@ namespace ex12
     };
 } // namespace ex12
 
+// "Taking locks" the right way
+
 namespace ex13
 {
-    template <typename M>
+    // Avoiding lock leaks:
+    // - You might take a lock on a particular mutex, and accidentally forget to write the code that frees it.
+    // - You might have written that code, but due to an early return or an exception being thrown, the code
+    //   never runs and the mutex remains locked!
+
+    // How unique_lock could be implemented - not used:
+    template <typename Mutex>
     class unique_lock
     {
-        M   *m_mtx    = nullptr;
-        bool m_locked = false;
+        Mutex *m_mtx    = nullptr;
+        bool   m_locked = false;
 
       public:
         constexpr unique_lock() noexcept = default;
 
-        constexpr unique_lock(M *p) noexcept : m_mtx(p)
+        constexpr unique_lock(Mutex *p) noexcept : m_mtx(p)
         {
         }
 
-        M *
+        Mutex *
         mutex() const noexcept
         {
             return m_mtx;
@@ -329,12 +394,15 @@ namespace ex13
     void
     test()
     {
-        std::mutex                   m;
+        std::mutex m;
+
         std::unique_lock<std::mutex> lk(m);
         assert(lk.owns_lock());
+
         auto lk2 = std::move(lk);
         assert(!lk.owns_lock());
         assert(lk2.owns_lock());
+
         lk2.unlock();
         assert(!lk2.owns_lock());
     }
@@ -357,7 +425,7 @@ namespace ex14
         void
         locked_decrement()
         {
-            std::lock_guard lk(m_mtx); // C++17 only
+            std::lock_guard lk(m_mtx); // C++17 only: CTAD
             m_value -= 1;
         }
     };
@@ -371,6 +439,8 @@ namespace ex14
         assert(l.m_value == 0);
     }
 } // namespace ex14
+
+// Always associate a mutex with its controlled data
 
 namespace ex15
 {
