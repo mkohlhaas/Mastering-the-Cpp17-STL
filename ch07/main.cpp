@@ -195,6 +195,8 @@ namespace ex08
     void
     test()
     {
+        std::cout << "== namespace ex08 ==\n";
+
         std::atomic<int> a = 6;
 
         a *= 9; // This isn't allowed!
@@ -328,6 +330,7 @@ namespace ex13
     template <typename Mutex>
     class unique_lock
     {
+      private:
         Mutex *m_mtx    = nullptr;
         bool   m_locked = false;
 
@@ -446,6 +449,7 @@ namespace ex15
 {
     class StreamingAverage
     {
+      private:
         double m_sum          = 0;
         int    m_count        = 0;
         double m_last_average = 0;
@@ -495,7 +499,7 @@ namespace ex16
         int    m_count        = 0;
         double m_last_average = 0;
 
-        std::mutex m_sum_count_mtx;
+        std::mutex m_sum_count_mtx; // careful naming of the mutex
 
         // ...
     };
@@ -505,6 +509,7 @@ namespace ex17
 {
     class StreamingAverage
     {
+        // a better way is via a nested struct definition
         struct
         {
             double     sum   = 0;
@@ -523,11 +528,13 @@ namespace ex18
     template <class Data>
     class Guarded
     {
+      private:
         std::mutex m_mtx;
         Data       m_data;
 
         class Handle
         {
+          private:
             std::unique_lock<std::mutex> m_lk;
             Data                        *m_ptr;
 
@@ -535,6 +542,7 @@ namespace ex18
             Handle(std::unique_lock<std::mutex> lk, Data *p) : m_lk(std::move(lk)), m_ptr(p)
             {
             }
+
             auto
             operator->() const
             {
@@ -543,11 +551,13 @@ namespace ex18
         };
 
       public:
+        // Place the mutex in a class that allows access to its private members
+        // only when the mutex is locked, by returning an RAII handle.
         Handle
         lock()
         {
             std::unique_lock lk(m_mtx);
-            return Handle{std::move(lk), &m_data};
+            return Handle{std::move(lk), &m_data}; // unique_lock is movable; lock_guard is not
         }
     };
 
@@ -567,8 +577,8 @@ namespace ex18
         double
         get_current_average()
         {
-            auto h         = m_sc.lock();
-            m_last_average = h->m_sum / h->m_count;
+            auto guts_handle = m_sc.lock();
+            m_last_average   = guts_handle->m_sum / guts_handle->m_count;
             return m_last_average;
         }
     };
@@ -583,8 +593,12 @@ namespace ex20
             double m_sum   = 0;
             int    m_count = 0;
         };
+
         ::ex18::Guarded<Guts> m_sc;
 
+        // Because of the two calls to m_sc.lock(), there is a gap between
+        // the read of m_sum and the read of m_count. If the producer thread
+        // calls add_value during this gap, we will compute an incorrect average.
         double
         get_sum()
         {
@@ -614,6 +628,7 @@ namespace ex21
             double m_sum   = 0;
             int    m_count = 0;
         };
+
         ::ex18::Guarded<Guts> m_sc;
 
         double
@@ -631,20 +646,27 @@ namespace ex21
         double
         get_current_average()
         {
+            // The line marked LOCK 1 causes the mutex to become locked;
+            // then, on the line marked LOCK 2, we try to lock the mutex again.
+            // -> Deadlock with oneself!
             auto h = m_sc.lock(); // LOCK 1
             return get_sum() / get_count();
         }
     };
 } // namespace ex21
 
+// Special-purpose mutex types
+
 namespace ex22
 {
     void
     test()
     {
+        std::cout << "== namespace ex22 ==\n";
+
         using namespace std::literals;
 
-        std::timed_mutex  m;
+        std::timed_mutex  m; // offers try_lock_for() and try_lock_until()
         std::atomic<bool> ready = false;
 
         std::thread thread_b([&]() {
@@ -677,34 +699,41 @@ namespace ex23
     void
     test()
     {
+        std::cout << "== namespace ex23 ==\n";
+
         using namespace std::literals;
 
-        // ex24
-        auto count_ms = [](auto &&d) -> int {
+        auto count_ms = [](auto &&duration) -> int {
             using namespace std::chrono;
-            return duration_cast<milliseconds>(d).count();
+            return duration_cast<milliseconds>(duration).count();
         };
 
         std::timed_mutex  m1, m2;
         std::atomic<bool> ready = false;
 
         std::thread thread_b([&]() {
+            std::this_thread::sleep_for(50ms);
             std::unique_lock lk1(m1);
             std::unique_lock lk2(m2);
-            puts("Thread B got the locks.");
+            puts("Thread B got the two locks.");
             ready = true;
             std::this_thread::sleep_for(50ms);
             lk1.unlock();
             std::this_thread::sleep_for(50ms);
         });
 
+        // Be careful never to write a polling loop that does not contain a sleep,
+        // because in that case the compiler is within its rights to collapse all the
+        // consecutive loads of ready down into a single load and a (necessarily
+        // infinite) loop.
         while (!ready)
         {
+            printf("Thread A is sleeping.\n");
             std::this_thread::sleep_for(10ms);
         }
 
         auto start_time = std::chrono::system_clock::now();
-        auto deadline   = start_time + 100ms;
+        auto deadline   = start_time + 200ms;
 
         bool got_m1     = m1.try_lock_until(deadline);
         auto elapsed_m1 = std::chrono::system_clock::now() - start_time;
@@ -714,13 +743,13 @@ namespace ex23
 
         if (got_m1)
         {
-            printf("Thread A got the first lock after %dms.\n", count_ms(elapsed_m1));
+            printf("Thread A got the 1st lock after %dms.\n", count_ms(elapsed_m1));
             m1.unlock();
         }
 
         if (got_m2)
         {
-            printf("Thread A got the second lock after %dms.\n", count_ms(elapsed_m2));
+            printf("Thread A got the 2nd lock after %dms.\n", count_ms(elapsed_m2));
             m2.unlock();
         }
 
@@ -728,11 +757,18 @@ namespace ex23
     }
 } // namespace ex23
 
+// Upgrading a read-write lock
+
 namespace ex25
 {
+    // There are third-party libraries that attempt to solve this problem,
+    // such as boost::thread::upgrade_lock.
+
+    // The standard solution is that if you hold a read lock and want a
+    // write lock, you must release your read lock and then go stand in line
+    // for a write lock with everyone else
     template <class M>
     std::unique_lock<M>
-
     upgrade(std::shared_lock<M> lk)
     {
         lk.unlock();
@@ -744,15 +780,21 @@ namespace ex25
     test()
     {
         std::shared_mutex m;
-        std::shared_lock  slk(m);
+        std::shared_lock  slk(m); // shared lock is a read-write lock (one writer - many reads; one or the other)
 
         auto ulk = upgrade(std::move(slk));
         assert(ulk.owns_lock());
     }
 } // namespace ex25
 
+// Downgrading a read-write lock
+
 namespace ex26
 {
+    // If your architectural design calls for a read-write lock,
+    // I strongly recommend using something like boost::thread::shared_mutex,
+    // which comes "batteries included."
+
     template <class M>
     std::shared_lock<M>
     downgrade(std::unique_lock<M> lk)
@@ -772,6 +814,8 @@ namespace ex26
         assert(slk.owns_lock());
     }
 } // namespace ex26
+
+// Waiting for a condition
 
 namespace ex27
 {
@@ -910,6 +954,8 @@ namespace ex30
     void
     test()
     {
+        std::cout << "== namespace ex30 ==\n";
+
         using namespace std::literals;
         auto count_ms = [](auto &&d) -> int {
             using namespace std::chrono;
@@ -1217,6 +1263,8 @@ namespace ex37
     void
     test()
     {
+        std::cout << "== namespace ex37 ==\n";
+
         using namespace std::literals; // for "ms"
 
         std::thread a([]() {
@@ -1325,6 +1373,8 @@ namespace ex41
     void
     test()
     {
+        std::cout << "== namespace ex41 ==\n";
+
         using namespace std::literals;
 
         std::mutex               ready;
@@ -1488,6 +1538,8 @@ namespace ex43
     void
     test2()
     {
+        std::cout << "== namespace ex43 ==\n";
+
         using namespace std::literals;
 
         std::future<int> f6;
