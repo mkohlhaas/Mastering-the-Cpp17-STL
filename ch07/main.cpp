@@ -817,9 +817,12 @@ namespace ex26
 
 // Waiting for a condition
 
+// std::condition_variable is a synchronization primitive used with a std::mutex
+// to block one or more threads until another thread both modifies a shared variable
+// (the condition) and notifies the std::condition_variable.
+
 namespace ex27
 {
-    using namespace std::literals;
     bool prepped = false;
 
     void
@@ -845,8 +848,10 @@ namespace ex27
         });
 
         // Wait for thread B to be ready.
+        // Wasteful polling loop on a std::atomic variable.
         while (!ready)
         {
+            using namespace std::literals;
             std::this_thread::sleep_for(10ms);
         }
 
@@ -874,9 +879,11 @@ namespace ex28
     void
     test()
     {
-        bool                    ready = false; // not atomic!
-        std::mutex              ready_mutex;
-        std::condition_variable cv;
+        using cond_var = std::condition_variable;
+
+        bool       ready = false; // not atomic!
+        std::mutex ready_mutex;
+        cond_var   cv;
 
         std::thread thread_b([&]() {
             prep_work();
@@ -891,10 +898,7 @@ namespace ex28
         // Wait for thread B to be ready.
         {
             std::unique_lock lk(ready_mutex);
-            while (!ready)
-            {
-                cv.wait(lk);
-            }
+            cv.wait(lk, [&ready] { return ready; });
         }
 
         // Now thread B has completed its prep work.
@@ -902,6 +906,9 @@ namespace ex28
         thread_b.join();
     }
 } // namespace ex28
+
+// Manually fiddling with mutex locks and condition variables is
+// almost as dangerous as fiddling with raw mutexes or raw pointers.
 
 namespace ex29
 {
@@ -921,9 +928,14 @@ namespace ex29
     void
     test()
     {
-        bool                        ready = false;
-        std::shared_mutex           ready_rwlock;
-        std::condition_variable_any cv;
+        // read-write lock version
+
+        using cond_var = std::condition_variable_any;
+        using sh_mutex = std::shared_mutex;
+
+        bool     ready = false;
+        sh_mutex ready_rwlock;
+        cond_var cv;
 
         std::thread thread_b([&]() {
             prep_work();
@@ -938,16 +950,23 @@ namespace ex29
         // Wait for thread B to be ready.
         {
             std::shared_lock lk(ready_rwlock);
-            while (!ready)
-            {
-                cv.wait(lk);
-            }
+            cv.wait(lk, [&ready] { return ready; });
         }
+
         // Now thread B has completed its prep work.
         assert(prepped);
         thread_b.join();
     }
 } // namespace ex29
+
+// Promises about futures
+
+// We might say that a promise-future pair is like a directed, portable, one-shot wormhole. It's
+// "directed" because you're allowed to shove data into only the "promise" side and retrieve
+// data only via the "future" side. It's "portable" because if you own one end of the wormhole,
+// you can move that end around and even move it between threads; you won't break the
+// tunnel between the two ends. And it's "one-shot" because once you've shoved one piece of
+// data into the "promise" end, you can't shove any more.
 
 namespace ex30
 {
@@ -957,9 +976,9 @@ namespace ex30
         std::cout << "== namespace ex30 ==\n";
 
         using namespace std::literals;
-        auto count_ms = [](auto &&d) -> int {
+        auto count_ms = [](auto &&duration) -> int {
             using namespace std::chrono;
-            return duration_cast<milliseconds>(d).count();
+            return duration_cast<milliseconds>(duration).count();
         };
 
         std::promise<int> p1, p2;
@@ -1006,19 +1025,20 @@ namespace ex31
     void
     test()
     {
+        // very clean code
+
         std::promise<void> ready_p;
-        std::future<void>  ready_f = ready_p.get_future();
+        std::future<void>  ready_f = ready_p.get_future(); // no data shoving; signal sending/receiving
 
         std::thread thread_b([&]() {
             prep_work();
-            ready_p.set_value();
+            ready_p.set_value();                           // sending signal
             main_work();
         });
 
-        // Wait for thread B to be ready.
-        ready_f.wait();
-        // Now thread B has completed its prep work.
-        assert(prepped);
+        ready_f.wait();                                    // wait for thread B to be ready; receiving signal
+
+        assert(prepped);                                   // Now thread B has completed its prep work.
         thread_b.join();
     }
 } // namespace ex31
@@ -1070,6 +1090,8 @@ namespace ex32
     }
 } // namespace ex32
 
+// Packaging up tasks for later
+
 namespace ex33
 {
     template <class T>
@@ -1079,7 +1101,7 @@ namespace ex33
         std::promise<T>    m_promise;
 
       public:
-        template <class F>
+        template <typename F>
         simple_packaged_task(const F &f) : m_func(f)
         {
         }
@@ -1100,11 +1122,14 @@ namespace ex33
             }
             catch (...)
             {
-                m_promise.set_exception(std::current_exception());
+                // By using promises and futures, we can "teleport" exceptions across threads.
+                m_promise.set_exception(std::current_exception()); // shove an exception through the wormhole
             }
         }
     };
 } // namespace ex33
+
+// The future of futures
 
 namespace ex34
 {
@@ -1129,13 +1154,7 @@ namespace ex34
         return 1;
     }
 
-#define bool                                                                                                           \
-    t1.join();                                                                                                         \
-    t2.join();                                                                                                         \
-    t3.join();                                                                                                         \
-    bool
-
-    template <class T>
+    template <typename T>
     auto
     pf()
     {
@@ -1155,6 +1174,7 @@ namespace ex34
             Connection conn = slowly_open_connection();
             p1.set_value(conn);
             // DANGER: what if slowly_open_connection throws?
+            // We needed a try...catch statement - for every thread.
         });
 
         auto t2 = std::thread([p2 = std::move(p2)]() mutable {
@@ -1168,11 +1188,12 @@ namespace ex34
         });
 
         bool success = (f2.get() == f3.get());
+        assert(success);
 
-        // assert(success); // clang: Unknown type name 't1' [unknown_typename]
+        t1.join();
+        t2.join();
+        t3.join();
     }
-
-#undef bool
 } // namespace ex34
 
 namespace ex35
@@ -1201,6 +1222,25 @@ namespace ex35
     void
     test()
     {
+        // If the function of std::async returns a value or throws an exception,
+        // it is stored in the shared state accessible through the std::future
+        // that std::async returns to the caller.
+
+        // Bad code!
+        //
+        // Every time you see a .get() in that code, you should think, "What a waste of a context
+        // switch!"
+        // And every time you see a thread being spawned (whether explicitly or via async),
+        // you should think, "What a possibility for the operating system to run out of kernel threads
+        // and for my program to start throwing unexpected exceptions from the constructor of std::thread!"
+
+        // Something like this is already available in Boost; and Facebook's Folly library contains a
+        // particularly robust and fully featured implementation even better than Boost's. While we
+        // wait for C++20 to improve the situation, my advice is to use Folly if you can afford the
+        // cognitive overhead of integrating it into your build system. The single advantage of
+        // std::future is that it's standard; you'll be able to use it on just about any platform
+        // without needing to worry about downloads, include paths, or licensing terms.
+
         auto f1 = std::async(slowly_open_connection);
         auto f2 = std::async(slowly_get_data_from_disk);
         auto f3 = std::async([f1 = std::move(f1)]() mutable {
@@ -1214,49 +1254,7 @@ namespace ex35
     }
 } // namespace ex35
 
-namespace ex36
-{
-    using Data       = int;
-    using Connection = double;
-
-    Connection
-    slowly_open_connection()
-    {
-        return 0;
-    }
-
-    Data
-    slowly_get_data_from_disk()
-    {
-        return 1;
-    }
-
-    Data
-    slowly_get_data_from_connection(Connection)
-    {
-        return 1;
-    }
-
-#if 0 // too hard to get Folly in here to test with
-
-void test() {
-    auto f1 = my::async(slowly_open_connection);
-    auto f2 = my::async(slowly_get_data_from_disk);
-    auto f3 = f1.then([](Connection conn) {
-        return slowly_get_data_from_connection(conn);
-    });
-    bool success = f2.get() == f3.get();
-
-    assert(success);
-}
-
-#else
-    void
-    test()
-    {
-    }
-#endif
-} // namespace ex36
+// Speaking of threads...
 
 namespace ex37
 {
@@ -1265,7 +1263,7 @@ namespace ex37
     {
         std::cout << "== namespace ex37 ==\n";
 
-        using namespace std::literals; // for "ms"
+        using namespace std::literals;
 
         std::thread a([]() {
             puts("Thread A says hello ~0ms");
@@ -1286,9 +1284,76 @@ namespace ex37
     }
 } // namespace ex37
 
+// Identifying individual threads and the current thread
+
+namespace ex41
+{
+    std::string
+    to_string(std::thread::id id)
+    {
+        std::ostringstream o;
+        o << id;
+        return o.str();
+    }
+
+    void
+    test()
+    {
+        std::cout << "== namespace ex41 ==\n";
+
+        using namespace std::literals;
+
+        std::mutex               ready;
+        std::unique_lock         lk(ready);
+        std::vector<std::thread> threads;
+        std::vector<std::thread> others;
+
+        auto task = [&]() {
+            // Block here until the main thread is ready.
+            (void)std::lock_guard(ready);
+            // Now go. Find my thread-id in the vector.
+            auto my_id = std::this_thread::get_id();
+            auto iter  = std::find_if(threads.begin(),                                            //
+                                      threads.end(),                                              //
+                                      [=](const std::thread &t) { return t.get_id() == my_id; }); //
+
+            printf("Thread %s %s in the list.\n", to_string(my_id).c_str(), iter != threads.end() ? "is" : "is not");
+        };
+
+        for (int i = 0; i < 10; ++i)
+        {
+            std::thread t(task);
+            if (i % 2)
+            {
+                threads.push_back(std::move(t));
+            }
+            else
+            {
+                others.push_back(std::move(t));
+            }
+        }
+
+        // Let all the threads run.
+        ready.unlock();
+
+        // Join all the threads.
+        for (std::thread &t : threads)
+        {
+            t.join();
+        }
+
+        for (std::thread &t : others)
+        {
+            t.join();
+        }
+    }
+} // namespace ex41
+
+// Thread exhaustion and std::async
+
 namespace ex38
 {
-    template <class F>
+    template <typename F>
     auto
     async(F &&func)
     {
@@ -1298,7 +1363,8 @@ namespace ex38
 
         PromiseType promise;
         FutureType  future = promise.get_future();
-        auto        t      = std::thread([func = std::forward<F>(func), promise = std::move(promise)]() mutable {
+
+        auto t = std::thread([func = std::forward<F>(func), promise = std::move(promise)]() mutable {
             try
             {
                 ResultType result = func();
@@ -1321,11 +1387,8 @@ namespace ex38
     void
     test()
     {
-        if (false)
-        {
-            auto p = std::make_unique<int>(42);
-            async([p = std::move(p)]() { return *p; });
-        }
+        auto p = std::make_unique<int>(42);
+        async([p = std::move(p)]() { return *p; });
     }
 } // namespace ex38
 
@@ -1360,81 +1423,27 @@ namespace ex40
     }
 } // namespace ex40
 
-namespace ex41
-{
-    std::string
-    to_string(std::thread::id id)
-    {
-        std::ostringstream o;
-        o << id;
-        return o.str();
-    }
-
-    void
-    test()
-    {
-        std::cout << "== namespace ex41 ==\n";
-
-        using namespace std::literals;
-
-        std::mutex               ready;
-        std::unique_lock         lk(ready);
-        std::vector<std::thread> threads;
-
-        auto task = [&]() {
-            // Block here until the main thread is ready.
-            (void)std::lock_guard(ready);
-            // Now go. Find my thread-id in the vector.
-            auto my_id = std::this_thread::get_id();
-            auto iter =
-                std::find_if(threads.begin(), threads.end(), [=](const std::thread &t) { return t.get_id() == my_id; });
-            printf("Thread %s %s in the list.\n", to_string(my_id).c_str(), iter != threads.end() ? "is" : "is not");
-        };
-
-        std::vector<std::thread> others;
-        for (int i = 0; i < 10; ++i)
-        {
-            std::thread t(task);
-            if (i % 2)
-            {
-                threads.push_back(std::move(t));
-            }
-            else
-            {
-                others.push_back(std::move(t));
-            }
-        }
-
-        // Let all the threads run.
-        ready.unlock();
-
-        // Join all the threads.
-        for (std::thread &t : threads)
-        {
-            t.join();
-        }
-        for (std::thread &t : others)
-        {
-            t.join();
-        }
-    }
-} // namespace ex41
+// Building your own thread pool
 
 namespace ex43
 {
     class ThreadPool
     {
       private:
-        using UniqueFunction = std::packaged_task<void()>;
+        using UniqueFunction = std::packaged_task<void()>; // folly::Function could be an alternative
+        using vec_threads    = std::vector<std::thread>;
+        using cond_var       = std::condition_variable;
+        using queue_funcs    = std::queue<UniqueFunction>;
+
         struct
         {
-            std::mutex                 mtx;
-            std::queue<UniqueFunction> work_queue;
-            bool                       aborting = false;
+            std::mutex  mtx;
+            queue_funcs work_queue;
+            bool        aborting = false;
         } m_state;
 
-        std::vector<std::thread> m_workers;
-        std::condition_variable  m_cv;
+        vec_threads m_workers;
+        cond_var    m_cv;
 
       public:
         ThreadPool(int size)
@@ -1447,11 +1456,13 @@ namespace ex43
 
         ~ThreadPool()
         {
-            if (std::lock_guard lk(m_state.mtx); true)
             {
+                std::lock_guard lk(m_state.mtx);
                 m_state.aborting = true;
             }
+
             m_cv.notify_all();
+
             for (std::thread &t : m_workers)
             {
                 t.join();
@@ -1461,8 +1472,8 @@ namespace ex43
         void
         enqueue_task(UniqueFunction task)
         {
-            if (std::lock_guard lk(m_state.mtx); true)
             {
+                std::lock_guard lk(m_state.mtx);
                 m_state.work_queue.push(std::move(task));
             }
             m_cv.notify_one();
@@ -1480,6 +1491,7 @@ namespace ex43
                 {
                     m_cv.wait(lk);
                 }
+
                 if (m_state.aborting)
                 {
                     break;
@@ -1490,10 +1502,13 @@ namespace ex43
                 UniqueFunction task = std::move(m_state.work_queue.front());
                 m_state.work_queue.pop();
 
+                // Rule: Never call a user-provided callback while holding a mutex lock!
+                // Would be a recipe for dead-lock!
                 lk.unlock();
+
                 // Actually run the task. This might take a while.
-                task();
                 // When we're done with this task, go get another.
+                task();
             }
         }
 
@@ -1514,16 +1529,18 @@ namespace ex43
             // Give the user a future for retrieving the result.
             return future;
         }
-    }; // class ThreadPool
+    };
 
     void
     test()
     {
-        std::atomic<int>              sum(0);
-        ThreadPool                    tp(4);
-        std::vector<std::future<int>> futures;
+        using vec_future_ints = std::vector<std::future<int>>;
 
-        for (int i = 0; i < 60000; ++i)
+        std::atomic<int> sum(0);
+        ThreadPool       tp(4);         // 4 kernel threads
+        vec_future_ints  futures;
+
+        for (int i = 0; i < 60000; ++i) // creating 60,000 tasks
         {
             auto f = tp.async([i, &sum]() {
                 sum += i;
@@ -1531,6 +1548,8 @@ namespace ex43
             });
             futures.push_back(std::move(f));
         }
+        std::cout << sum << '\n';
+
         assert(futures[42].get() == 42);
         assert(903 <= sum && sum <= 1799970000);
     }
@@ -1593,6 +1612,12 @@ namespace ex43
         }
     }
 } // namespace ex43
+
+// Improving our thread pool's performance
+
+// Of course, there also exists professionally written thread-pool classes.
+// Boost.Asio containsone, for example, and Asio is on track to be brought
+// into the standard perhaps in C++20.
 
 // namespace ex50
 // {
@@ -1746,13 +1771,11 @@ main()
     ex32::test();
     ex34::test();
     ex35::test();
-    ex36::test();
     ex37::test();
 
     using namespace std::literals;
     std::this_thread::sleep_for(20ms);
 
-    ex38::test();
     ex40::test();
     ex41::test();
     ex43::test();
