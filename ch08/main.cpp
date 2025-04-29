@@ -1,20 +1,22 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdio>
-#include <forward_list>
 #include <iterator>
 #include <list>
 #include <map>
 #include <memory>
-// #include <memory_resource>
 #include <new>
 #include <scoped_allocator>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
-namespace ex1
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+// Refresher - Interfaces versus concepts
+
+namespace ex01
 {
-    // ex1
     struct int_allocator_2014
     {
         int *allocate(size_t n, const void *hint = nullptr);
@@ -24,12 +26,10 @@ namespace ex1
     {
         int *allocate(size_t n);
     };
-    // dex1
-} // namespace ex1
+} // namespace ex01
 
-namespace ex2
+namespace ex02
 {
-    // ex2
     struct classical_base
     {
         virtual int *allocate(size_t n) = 0;
@@ -39,14 +39,12 @@ namespace ex2
     {
         int *allocate(size_t n) override;
     };
-    // dex2
-} // namespace ex2
+} // namespace ex02
 
-namespace ex3
+// Defining a heap with memory_resource
+
+namespace ex03
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-    // ex3
     static char   big_buffer[10000];
     static size_t index = 0;
 
@@ -66,11 +64,9 @@ namespace ex3
     {
         // drop it on the floor
     }
-// dex3
-#pragma GCC diagnostic pop
+
     namespace two
     {
-        // ex4
         void
         deallocate(void *p, size_t bytes)
         {
@@ -84,17 +80,16 @@ namespace ex3
                 // drop it on the floor
             }
         }
-        // dex4
     } // namespace two
-} // namespace ex3
+} // namespace ex03
 
-namespace ex5
+namespace ex05
 {
     namespace std::pmr
     {
-        // ex5
         class memory_resource
         {
+          private:
             virtual void *do_allocate(size_t bytes, size_t align)            = 0;
             virtual void  do_deallocate(void *p, size_t bytes, size_t align) = 0;
             virtual bool  do_is_equal(const memory_resource &rhs) const      = 0;
@@ -105,32 +100,33 @@ namespace ex5
             {
                 return do_allocate(bytes, align);
             }
+
             void
             deallocate(void *p, size_t bytes, size_t align)
             {
                 return do_deallocate(p, bytes, align);
             }
+
             bool
             is_equal(const memory_resource &rhs) const
             {
                 return do_is_equal(rhs);
             }
         };
-        // dex5
     } // namespace std::pmr
+
     namespace std
     {
         using ::std::bad_alloc;
-    }
-    namespace std
-    {
         using ::std::max_align_t;
-    }
-    // ex6
+    } // namespace std
+
     class example_resource : public std::pmr::memory_resource
     {
         alignas(std::max_align_t) char big_buffer[10000];
         size_t index = 0;
+
+        // implement private interface
         void *
         do_allocate(size_t bytes, size_t align) override
         {
@@ -142,30 +138,13 @@ namespace ex5
             index += (-index % align) + bytes;
             return &big_buffer[index - bytes];
         }
+
         void
         do_deallocate(void *, size_t, size_t) override
         {
             // drop it on the floor
         }
-        bool
-        do_is_equal(const memory_resource &rhs) const override
-        {
-            return this == &rhs;
-        }
-    };
-    // dex6
-    // ex7
-    class UNKNOWN : public std::pmr::memory_resource
-    {
-        void *
-        do_allocate(size_t, size_t) override
-        {
-            throw std::bad_alloc();
-        }
-        void
-        do_deallocate(void *, size_t, size_t) override
-        {
-        }
+
         bool
         do_is_equal(const memory_resource &rhs) const override
         {
@@ -173,18 +152,45 @@ namespace ex5
         }
     };
 
+    // Using the standard memory resources
+
+    class UNKNOWN : public std::pmr::memory_resource
+    {
+        void *
+        do_allocate(size_t, size_t) override
+        {
+            throw std::bad_alloc();
+        }
+
+        void
+        do_deallocate(void *, size_t, size_t) override
+        {
+        }
+
+        bool
+        do_is_equal(const memory_resource &rhs) const override
+        {
+            return this == &rhs;
+        }
+    };
+
+    // null_memory_resource seems fairly useless; all it does is throw an exception when you
+    // try to allocate from it. However, it can be useful when you start using the more complicated
+    // memory resources which we'll see in a moment.
+    //
+    // Main usage of null_memory_resource: ensure that a memory pool which requires memory allocated
+    // on the stack will NOT allocate memory on the heap if it needs more memory.
     std::pmr::memory_resource *
     null_memory_resource() noexcept
     {
         static UNKNOWN singleton;
         return &singleton;
     }
-    // dex7
+
     void
     test()
     {
-#if 0  // neither libc++ nor libstdc++ support <memory_resource> yet
-//ex8
+#if 0 // neither libc++ nor libstdc++ support <memory_resource> yet
     alignas(16) char big_buffer[10000];
 
     std::pmr::monotonic_buffer_resource a(
@@ -210,14 +216,21 @@ namespace ex5
     } catch (const std::bad_alloc&) {
         puts("The null_memory_resource did its job!");
     }
-//dex8
-#endif // 0
+#endif
     }
+
+      // Allocating from a pool resource
+
     void
     test2()
     {
-#if 0  // neither libc++ nor libstdc++ support <memory_resource> yet
-//ex9
+#if 0 // neither libc++ nor libstdc++ support <memory_resource> yet
+     
+    // Unfortunately, the standard interface leaves
+    // much to be desired here--so much so that frankly I recommend that if these parameters
+    // truly matter to you, you should be implementing your own derived memory_resource and
+    // not touching the standard library's version at all.
+    
     std::pmr::pool_options options;
     options.max_blocks_per_chunk = 100;
     options.largest_required_pool_block = 256;
@@ -226,15 +239,15 @@ namespace ex5
         options,
         std::pmr::new_delete_resource()
     );
-//dex9
     (void)a;
-#endif // 0
+#endif
     }
-} // namespace ex5
+} // namespace ex05
+
+// The 500 hats of the standard allocator
 
 namespace ex10
 {
-    // ex10
     template <class T>
     struct allocator
     {
@@ -245,6 +258,7 @@ namespace ex10
         {
             return static_cast<T *>(::operator new(n * sizeof(T)));
         }
+
         void
         deallocate(T *p, size_t)
         {
@@ -261,7 +275,7 @@ namespace ex10
         allocator()                  = default;
         allocator(const allocator &) = default;
     };
-    // dex10
+
     void
     test()
     {
@@ -274,7 +288,6 @@ namespace ex10
 
 namespace ex11
 {
-    // ex11
     template <class T>
     struct helloworld
     {
@@ -286,6 +299,7 @@ namespace ex11
             printf("hello world %zu\n", n);
             return static_cast<T *>(::operator new(n * sizeof(T)));
         }
+
         void
         deallocate(T *p, size_t)
         {
@@ -300,8 +314,11 @@ namespace ex11
         v.push_back(42); // prints "hello world 1"
         v.push_back(42); // prints "hello world 2"
         v.push_back(42); // prints "hello world 4"
+        v.push_back(42);
+        v.push_back(42);
+        v.push_back(42);
+        v.push_back(42); // prints "hello world 8"
     }
-    // dex11
 } // namespace ex11
 
 namespace ex12
@@ -314,23 +331,31 @@ namespace ex12
         T *
         allocate(size_t n)
         {
-            printf("hello world %zu\n", n);
+            printf("hello world list %zu\n", n);
             return static_cast<T *>(::operator new(n * sizeof(T)));
         }
+
         void
         deallocate(T *p, size_t)
         {
             ::operator delete(static_cast<void *>(p));
         }
     };
-    // ex12
+
     void
     test()
     {
+        // works, contrary to common belief
         std::list<int, helloworld<int>> v;
-        v.push_back(42);
+        v.push_back(42); // prints "hello world list 1"
+        v.push_back(42); // prints "hello world list 1"
+        v.push_back(42); // prints "hello world list 1"
+        v.push_back(42); // prints "hello world list 1"
+        v.push_back(42); // prints "hello world list 1"
+        v.push_back(42); // prints "hello world list 1"
+        v.push_back(42); // prints "hello world list 1"
+        v.push_back(42); // prints "hello world list 1"
     }
-    // dex12
 } // namespace ex12
 
 namespace ex13
@@ -346,22 +371,21 @@ namespace ex13
             printf("hello world %zu\n", n);
             return static_cast<T *>(::operator new(n * sizeof(T)));
         }
+
         void
         deallocate(T *p, size_t)
         {
             ::operator delete(static_cast<void *>(p));
         }
     };
+
     void
     test()
     {
-        // ex13
-        using AllocOfInt = helloworld<int>;
-
+        using AllocOfInt  = helloworld<int>;
         using AllocOfChar = std::allocator_traits<AllocOfInt>::rebind_alloc<char>;
 
         // Now alloc_of_char is helloworld<char>
-        // dex13
         static_assert(std::is_same_v<AllocOfChar, helloworld<char>>);
     }
 } // namespace ex13
@@ -371,7 +395,6 @@ namespace ex14
     void
     test()
     {
-        // ex14
         using PtrToInt = int *;
 
         using PtrToChar = std::pointer_traits<PtrToInt>::rebind<char>;
@@ -381,18 +404,18 @@ namespace ex14
         using PtrToConstVoid = std::pointer_traits<PtrToInt>::rebind<const void>;
 
         // Now PtrToConstVoid is const void*
-        // dex14
         static_assert(std::is_same_v<PtrToChar, char *>);
         static_assert(std::is_same_v<PtrToConstVoid, const void *>);
     }
 } // namespace ex14
+
+// Carrying metadata with fancy pointers
 
 namespace ex15
 {
     class Chunk;
     namespace fake
     {
-        // ex15
         template <class T>
         class ChunkyPtr
         {
@@ -409,6 +432,7 @@ namespace ex15
             {
                 return *m_ptr;
             }
+
             explicit
             operator T *() const
             {
@@ -423,7 +447,6 @@ namespace ex15
                 return m_chunk;
             }
         };
-        // dex15
     } // namespace fake
 
     template <class T>
@@ -437,112 +460,131 @@ namespace ex15
         ChunkyPtr(std::nullptr_t)
         {
         }
+
         ChunkyPtr &
         operator--()
         {
             --m_ptr;
             return *this;
         }
+
         ChunkyPtr &
         operator++()
         {
             ++m_ptr;
             return *this;
         }
+
         void
         operator++(int)
         {
             ++m_ptr;
         }
+
         explicit ChunkyPtr(T *p, Chunk *ch) : m_ptr(p), m_chunk(ch)
         {
         }
+
         template <class U>
         ChunkyPtr(ChunkyPtr<U> p) : m_ptr(static_cast<T *>(static_cast<U *>(p))), m_chunk(p.chunk())
         {
         }
+
         T &
         operator*() const
         {
             return *m_ptr;
         }
+
         T *
         operator->() const
         {
             return m_ptr;
         }
+
         operator bool() const
         {
             return m_ptr;
         }
+
         auto
         operator-(ChunkyPtr<T> p) const
         {
             return m_ptr - p.m_ptr;
         }
+
         template <class U>
         auto
         operator-(U i) const
         {
             return ChunkyPtr(m_ptr - i, m_chunk);
         }
+
         auto
         operator+(size_t i) const
         {
             return ChunkyPtr(m_ptr + i, m_chunk);
         }
+
         auto
         operator<(ChunkyPtr<T> p) const
         {
             return m_ptr < p.m_ptr;
         }
+
         explicit
         operator T *() const
         {
             return m_ptr;
         }
+
         auto
         chunk() const
         {
             return m_chunk;
         }
+
         using iterator_category = std::random_access_iterator_tag;
         using pointer           = ChunkyPtr<T>;
         using reference         = T &;
         using value_type        = T;
         using difference_type   = std::ptrdiff_t;
-        // ex38
+
         static ChunkyPtr<T>
         pointer_to(T &r) noexcept
         {
             return ChunkyPtr<T>(&r, nullptr);
         }
-        // dex38
     };
+
     template <class T>
     bool
     operator==(ChunkyPtr<T> a, std::nullptr_t)
     {
         return static_cast<T *>(a) == nullptr;
     }
+
     template <class T>
     bool
     operator!=(ChunkyPtr<T> a, std::nullptr_t)
     {
         return static_cast<T *>(a) != nullptr;
     }
+
     template <class T>
     bool
     operator==(ChunkyPtr<T> a, ChunkyPtr<T> b)
     {
         return static_cast<T *>(a) == static_cast<T *>(b);
     }
+
     template <class T>
     bool
     operator!=(ChunkyPtr<T> a, ChunkyPtr<T> b)
     {
         return static_cast<T *>(a) != static_cast<T *>(b);
     }
+
     template <>
     class ChunkyPtr<void>
     {
@@ -553,24 +595,28 @@ namespace ex15
         explicit ChunkyPtr(void *p, Chunk *ch) : m_ptr(p), m_chunk(ch)
         {
         }
+
         template <class U>
         ChunkyPtr(ChunkyPtr<U> p) : m_ptr(static_cast<U *>(p)), m_chunk(p.chunk())
         {
         }
+
         explicit
         operator void *() const
         {
             return m_ptr;
         }
+
         auto
         chunk() const
         {
             return m_chunk;
         }
     };
-    // ex17
+
     class Chunk
     {
+      private:
         char buffer[10000];
         int  index = 0;
         int  freed = 0;
@@ -581,6 +627,7 @@ namespace ex15
         {
             return (sizeof buffer - index) >= bytes;
         }
+
         auto
         allocate(size_t bytes)
         {
@@ -588,6 +635,7 @@ namespace ex15
             void *p = &buffer[index - bytes];
             return ChunkyPtr<void>(p, this);
         }
+
         void
         deallocate(void *, size_t bytes)
         {
@@ -601,6 +649,7 @@ namespace ex15
 
     class ChunkyMemoryResource
     {
+      private:
         std::list<Chunk> m_chunks;
 
       public:
@@ -620,6 +669,7 @@ namespace ex15
             }
             return m_chunks.emplace_back().allocate(bytes);
         }
+
         void
         deallocate(ChunkyPtr<void> p, size_t bytes, size_t)
         {
@@ -627,11 +677,11 @@ namespace ex15
             p.chunk()->deallocate(static_cast<void *>(p), bytes);
         }
     };
-    // dex17
-    // ex16
+
     template <class T>
     struct ChunkyAllocator
     {
+      public:
         using value_type = T;
         using pointer    = ChunkyPtr<T>;
 
@@ -649,6 +699,7 @@ namespace ex15
         {
             return m_resource->allocate(n * sizeof(T), alignof(T));
         }
+
         void
         deallocate(pointer p, size_t n)
         {
@@ -661,33 +712,35 @@ namespace ex15
         template <class U>
         friend struct ChunkyAllocator;
     };
-    // dex16
+
     void
     test()
     {
         using AllocOfInt  = ChunkyAllocator<int>;
         using AllocOfChar = std::allocator_traits<AllocOfInt>::rebind_alloc<char>;
+
         static_assert(std::is_same_v<std::allocator_traits<AllocOfChar>::void_pointer, ChunkyPtr<void>>);
 
-        // ex18
-        ChunkyMemoryResource                   mr;
-        std::vector<int, ChunkyAllocator<int>> v{&mr};
-        v.push_back(42);
-        // All the memory for v's underlying array
-        // is coming from blocks owned by "mr".
-        // dex18
-        //  Neither GCC nor Clang support fancy pointers with std::list.
-        //  std::list<int, ChunkyAllocator<int>> lst{&mr};
-        //  lst.push_back(42);
+        ChunkyMemoryResource mr;
+
+        // Neither GCC nor Clang support fancy pointers with std::vector and std::list.
+        // std::vector<int, AllocOfInt> v{&mr};
+        // v.push_back(42);
+
+        // All the memory for v's underlying array is coming from blocks owned by "mr".
+
+        // std::list<int, AllocOfInt> lst{&mr};
+        // lst.push_back(42);
     }
 } // namespace ex15
 
 namespace ex19
 {
-    // ex19
+    // The standard library provides no allocators that use fancy pointers;
+    // every library-provided allocator type uses raw pointers.
+
     namespace my
     {
-
         template <class VoidPtr>
         class fancy_memory_resource
         {
@@ -697,16 +750,19 @@ namespace ex19
             {
                 return do_allocate(bytes, align);
             }
+
             void
             deallocate(VoidPtr p, size_t bytes, size_t align = alignof(std::max_align_t))
             {
                 return do_deallocate(p, bytes, align);
             }
+
             bool
             is_equal(const fancy_memory_resource &rhs) const noexcept
             {
                 return do_is_equal(rhs);
             }
+
             virtual ~fancy_memory_resource() = default;
 
           private:
@@ -718,8 +774,9 @@ namespace ex19
         using memory_resource = fancy_memory_resource<void *>;
 
     } // namespace my
-    // dex19
 } // namespace ex19
+
+// Sticking a container to a single memory resource
 
 namespace ex21
 {
@@ -727,6 +784,7 @@ namespace ex21
     {
         class memory_resource
         {
+          private:
             virtual void *do_allocate(size_t bytes, size_t align)            = 0;
             virtual void  do_deallocate(void *p, size_t bytes, size_t align) = 0;
             virtual bool  do_is_equal(const memory_resource &rhs) const      = 0;
@@ -737,17 +795,20 @@ namespace ex21
             {
                 return do_allocate(bytes, align);
             }
+
             void
             deallocate(void *p, size_t bytes, size_t align)
             {
                 return do_deallocate(p, bytes, align);
             }
+
             bool
             is_equal(const memory_resource &rhs) const
             {
                 return do_is_equal(rhs);
             }
         };
+
         class simple_buffer_resource : public memory_resource
         {
           public:
@@ -757,6 +818,7 @@ namespace ex21
                 m_capacity = cap;
                 m_size     = 0;
             }
+
             void
             release()
             {
@@ -767,6 +829,7 @@ namespace ex21
             void  *m_buffer;
             size_t m_capacity;
             size_t m_size;
+
             void *
             do_allocate(size_t bytes, size_t align) override
             {
@@ -777,10 +840,12 @@ namespace ex21
                 m_size += (-m_size % align) + bytes;
                 return (char *)m_buffer + (m_size - bytes);
             }
+
             void
             do_deallocate(void *, size_t, size_t) override
             {
             }
+
             bool
             do_is_equal(const memory_resource &rhs) const noexcept override
             {
@@ -789,13 +854,14 @@ namespace ex21
         };
         using monotonic_buffer_resource = simple_buffer_resource;
     } // namespace std::pmr
+
     namespace std
     {
         using ::std::list;
         using ::std::swap;
         using ::std::vector;
     } // namespace std
-    // ex21
+
     template <class T>
     struct WidgetAlloc
     {
@@ -826,6 +892,7 @@ namespace ex21
 
     class Widget
     {
+      private:
         char                                buffer[10000];
         std::pmr::monotonic_buffer_resource mr{buffer, sizeof buffer};
         std::vector<int, WidgetAlloc<int>>  v{&mr};
@@ -835,10 +902,11 @@ namespace ex21
         static void
         swap_elems(Widget &a, Widget &b)
         {
-            std::swap(a.v, b.v);
+            // TODO: error
+            // std::swap(a.v, b.v);
         }
     };
-    // dex21
+
     void
     test()
     {
@@ -854,13 +922,14 @@ namespace ex22
         using ::std::less;
         using ::std::map;
         using ::std::vector;
+
         namespace pmr
         {
             template <class T>
             class polymorphic_allocator;
         }
     } // namespace std
-    // ex22
+
     namespace std::pmr
     {
 
@@ -873,7 +942,6 @@ namespace ex22
         // ...
 
     } // namespace std::pmr
-    // dex22
 } // namespace ex22
 
 namespace ex23
@@ -882,20 +950,17 @@ namespace ex23
     test()
     {
 #if 0 // neither libc++ nor libstdc++ support <memory_resource> yet
-//ex23
     std::pmr::vector<int> v2({1, 2, 3}, std::pmr::new_delete_resource());
         // Specifying a specific memory resource
 
     std::pmr::vector<int> v1 = {1, 2, 3};
         // Using the default memory resource
-//dex23
 #endif
     }
 } // namespace ex23
 
 namespace ex24
 {
-    // ex24
     template <class T, class A = std::allocator<T>>
     class uniqueish
     {
@@ -923,6 +988,7 @@ namespace ex24
         {
             return *m_ptr;
         }
+
         const T &
         value() const
         {
@@ -959,7 +1025,7 @@ namespace ex24
             }
         }
     };
-    // dex24
+
     void
     test()
     {
@@ -974,6 +1040,7 @@ namespace ex25
     template <class T, class A = std::allocator<T>>
     class uniqueish
     {
+      private:
         using Traits   = std::allocator_traits<A>;
         using FancyPtr = typename Traits::pointer;
 
@@ -994,6 +1061,7 @@ namespace ex25
         {
             clear();
             m_ptr = Traits::allocate(m_allocator, 1);
+
             try
             {
                 T *raw_ptr = static_cast<T *>(m_ptr);
@@ -1028,13 +1096,13 @@ namespace ex25
         {
             return *m_ptr;
         }
+
         const T &
         value() const
         {
             return *m_ptr;
         }
 
-        // ex25
         uniqueish(uniqueish &&rhs) : m_allocator(rhs.m_allocator)
         {
             m_ptr = std::exchange(rhs.m_ptr, nullptr);
@@ -1076,13 +1144,13 @@ namespace ex25
             }
             return *this;
         }
-        // dex25
-        // ex26
+
         void
         swap(uniqueish &rhs) noexcept
         {
             constexpr bool pocs = Traits::propagate_on_container_swap::value;
             using std::swap;
+
             if constexpr (pocs)
             {
                 // We can swap allocators, since
@@ -1106,13 +1174,14 @@ namespace ex25
                 rhs       = std::move(temp); // might throw
             }
         }
-        // dex26
     };
+
     void
     test()
     {
         uniqueish<int> ei;
         uniqueish<int> ej;
+
         ej.emplace(42);
         ei = std::move(ej);
         ei = std::move(ej);
@@ -1125,6 +1194,7 @@ namespace ex27
     template <class T, class A = std::allocator<T>>
     class uniqueish
     {
+      private:
         using Traits   = std::allocator_traits<A>;
         using FancyPtr = typename Traits::pointer;
 
@@ -1179,6 +1249,7 @@ namespace ex27
         {
             return *m_ptr;
         }
+
         const T &
         value() const
         {
@@ -1194,6 +1265,7 @@ namespace ex27
         operator=(uniqueish &&rhs)
         {
             constexpr bool pocma = Traits::propagate_on_container_move_assignment::value;
+
             if constexpr (pocma)
             {
                 // We can adopt the new allocator, since
@@ -1226,12 +1298,13 @@ namespace ex27
             }
             return *this;
         }
-        // ex27
+
         void
         swap(uniqueish &rhs) noexcept
         {
             constexpr bool pocs = Traits::propagate_on_container_swap::value;
             using std::swap;
+
             if constexpr (pocs)
             {
                 swap(this->m_allocator, rhs.m_allocator);
@@ -1242,6 +1315,7 @@ namespace ex27
         }
         // dex27
     };
+
     void
     test()
     {
@@ -1260,7 +1334,6 @@ namespace ex28
     test()
     {
 #if 0 // neither libc++ nor libstdc++ support <memory_resource> yet
-//ex28
     char buffer[100];
     auto mr = std::pmr::monotonic_buffer_resource(buffer, 100);
 
@@ -1273,12 +1346,11 @@ namespace ex28
     a.reserve(a.capacity() + 1);
         // this line will undoubtedly crash, as
         // it tries to delete[] a stack pointer
-//dex28
-//ex29
+
     auto temp = std::move(a);  // OK
     a = std::move(b);          // OK
     b = std::move(temp);       // OK
-//dex29
+    
     a.reserve(a.capacity() + 1);
 #endif
     }
@@ -1286,7 +1358,6 @@ namespace ex28
 
 namespace ex30
 {
-    // ex30
     template <class T>
     struct my_allocator : std::allocator<T>
     {
@@ -1311,13 +1382,14 @@ namespace ex30
             }
         }
     };
-    // dex30
+
     void
     test()
     {
         std::vector<int, my_allocator<int>> v;
         v.push_back(100);
         v.resize(10);
+
         std::list<int, my_allocator<int>> lst;
         lst.push_back(100);
         lst.resize(10);
@@ -1330,6 +1402,7 @@ namespace ex32
     {
         class memory_resource
         {
+          private:
             virtual void *do_allocate(size_t bytes, size_t align)            = 0;
             virtual void  do_deallocate(void *p, size_t bytes, size_t align) = 0;
             virtual bool  do_is_equal(const memory_resource &rhs) const      = 0;
@@ -1340,17 +1413,20 @@ namespace ex32
             {
                 return do_allocate(bytes, align);
             }
+
             void
             deallocate(void *p, size_t bytes, size_t align)
             {
                 return do_deallocate(p, bytes, align);
             }
+
             bool
             is_equal(const memory_resource &rhs) const
             {
                 return do_is_equal(rhs);
             }
         };
+
         class simple_buffer_resource : public memory_resource
         {
           public:
@@ -1360,6 +1436,7 @@ namespace ex32
                 m_capacity = cap;
                 m_size     = 0;
             }
+
             void
             release()
             {
@@ -1370,6 +1447,7 @@ namespace ex32
             void  *m_buffer;
             size_t m_capacity;
             size_t m_size;
+
             void *
             do_allocate(size_t bytes, size_t align) override
             {
@@ -1380,24 +1458,30 @@ namespace ex32
                 m_size += (-m_size % align) + bytes;
                 return (char *)m_buffer + (m_size - bytes);
             }
+
             void
             do_deallocate(void *, size_t, size_t) override
             {
             }
+
             bool
             do_is_equal(const memory_resource &rhs) const noexcept override
             {
                 return (this == &rhs);
             }
         };
+
         using monotonic_buffer_resource = simple_buffer_resource;
+
     } // namespace std::pmr
+
     namespace std
     {
         using ::std::max_align_t;
         using ::std::scoped_allocator_adaptor;
         using ::std::vector;
     } // namespace std
+
     template <class T>
     struct WidgetAlloc
     {
@@ -1419,16 +1503,19 @@ namespace ex32
         {
             return (T *)mr->allocate(n * sizeof(T), alignof(T));
         }
+
         void
         deallocate(void *p, size_t n)
         {
             mr->deallocate(p, n * sizeof(T), alignof(T));
         }
+
         bool
         operator==(const WidgetAlloc &rhs) const
         {
             return mr == rhs.mr;
         }
+
         bool
         operator!=(const WidgetAlloc &rhs) const
         {
@@ -1440,17 +1527,15 @@ namespace ex32
     test()
     {
         {
-            // ex31
             std::vector<std::vector<int>> vv;
             vv.emplace_back();
             vv.emplace_back();
             vv[0].push_back(1);
             vv[1].push_back(2);
             vv[1].push_back(3);
-            // dex31
         }
+
         {
-            // ex32
             char                                buffer[10000];
             std::pmr::monotonic_buffer_resource mr{buffer, sizeof buffer};
 
@@ -1464,10 +1549,9 @@ namespace ex32
             vv[0].push_back(1);
             vv[1].push_back(2);
             vv[1].push_back(3);
-            // dex32
         }
+
         {
-            // ex33
             char                                buffer[10000];
             std::pmr::monotonic_buffer_resource mr{buffer, sizeof buffer};
 
@@ -1481,14 +1565,12 @@ namespace ex32
             vv[0].push_back(1);
             vv[1].push_back(2);
             vv[1].push_back(3);
-            // dex33
         }
     }
 
     void
     test2()
     {
-        // ex34
         using InnerAlloc  = WidgetAlloc<int>;
         using InnerVector = std::vector<int, InnerAlloc>;
 
@@ -1498,8 +1580,7 @@ namespace ex32
         using OuterAlloc =
             std::scoped_allocator_adaptor<WidgetAlloc<MiddleVector>, WidgetAlloc<InnerVector>, WidgetAlloc<int>>;
         using OuterVector = std::vector<MiddleVector, OuterAlloc>;
-        // dex34
-        // ex35
+
         char                                bi[1000];
         std::pmr::monotonic_buffer_resource mri{bi, sizeof bi};
         char                                bm[1000];
@@ -1507,9 +1588,7 @@ namespace ex32
         char                                bo[1000];
         std::pmr::monotonic_buffer_resource mro{bo, sizeof bo};
 
-        OuterAlloc saa(&mro, &mrm, &mri);
-        // dex35
-        // ex36
+        OuterAlloc  saa(&mro, &mrm, &mri);
         OuterVector vvv(saa);
 
         vvv.emplace_back();
@@ -1520,10 +1599,9 @@ namespace ex32
 
         vvv[0][0].emplace_back(42);
         // This allocation comes from buffer "bi".
-        // dex36
+
         assert(*(int *)bi == 42);
         {
-            // ex37
             using InnerAlloc  = WidgetAlloc<int>;
             using InnerVector = std::vector<int, InnerAlloc>;
 
@@ -1552,8 +1630,8 @@ namespace ex32
 int
 main()
 {
-    ex5::test();
-    ex5::test2();
+    ex05::test();
+    ex05::test2();
     ex10::test();
     ex11::test();
     ex12::test();
